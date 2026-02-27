@@ -56,7 +56,7 @@ export default function Hero() {
                             className="w-full sm:w-auto rounded-full px-8 text-base font-semibold border-border hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
                             asChild
                         >
-                            <a href="#how-it-works" aria-label="Watch a demo of how EduLearn works">
+                            <a href="#how-it-works" aria-label="Watch a demo of how EduAble works">
                                 See How It Works
                             </a>
                         </Button>

@@ -93,7 +93,7 @@ export default function Header() {
             </div>
 
             <span className="text-lg sm:text-xl">
-              EduLearn
+              EduAble
             </span>
           </Link>
 
@@ -251,7 +251,7 @@ export default function Header() {
           <aside className="fixed right-0 top-0 h-full w-72 bg-card border-l border-border z-50 shadow-xl p-6 flex flex-col animate-slide-in-right">
 
             <h2 className="font-bold text-primary text-lg mb-6">
-              EduLearn
+              EduAble
             </h2>
 
             <nav className="flex flex-col gap-2">

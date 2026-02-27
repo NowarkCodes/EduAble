@@ -21,7 +21,7 @@ export default function Footer() {
                             href="/"
                             className="inline-flex items-center gap-3 sm:gap-4 font-black text-lg sm:text-xl lg:text-2xl tracking-tight 
                                      mb-4 sm:mb-6 text-background hover:opacity-90 transition-all duration-300 group"
-                            aria-label="EduLearn — Home"
+                            aria-label="EduAble — Home"
                         >
                             <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl 
                                           bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center 
@@ -31,7 +31,7 @@ export default function Footer() {
                                     <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                                 </svg>
                             </div>
-                            <span className="leading-tight">EduLearn</span>
+                            <span className="leading-tight">EduAble</span>
                         </a>
 
                         <p className="text-sm sm:text-base text-background/80 leading-relaxed max-w-md lg:max-w-none mb-6 sm:mb-8">
@@ -90,7 +90,7 @@ export default function Footer() {
                 <div className="border-t border-background/20 pt-6 sm:pt-8 lg:pt-10 flex flex-col sm:flex-row 
                                lg:justify-between items-center gap-4 sm:gap-6 text-center sm:text-left">
                     <p className="text-xs sm:text-sm text-background/60 font-medium order-2 sm:order-1">
-                        © 2026 EduLearn. All rights reserved.
+                        © 2026 EduAble. All rights reserved.
                     </p>
 
                     <div className="flex flex-wrap items-center gap-6 sm:gap-8 lg:gap-10 justify-center sm:justify-start order-1 sm:order-2">

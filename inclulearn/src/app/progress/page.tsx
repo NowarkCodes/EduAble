@@ -213,7 +213,7 @@ export default function ProgressPage() {
 
                 {/* Footer */}
                 <footer className="border-t border-slate-200 pt-5 text-xs text-slate-400 text-center">
-                    <p>© 2024 LearnAI Platform · Accessibility-First Learning</p>
+                    <p>© 2024 EduAble Platform · Accessibility-First Learning</p>
                 </footer>
             </div>
         </DashboardLayout>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { UserIcon } from 'lucide-react';
 
 /* ── SVG Icons ───────────────────────────────────── */
 function GridIcon({ size = 18 }: { size?: number }) {
@@ -70,8 +71,10 @@ function CloseIcon() {
 const navItems = [
     { label: 'Dashboard', icon: GridIcon, href: '/dashboard' },
     { label: 'My Courses', icon: BookIcon, href: '/courses' },
+    { label: 'All Courses', icon: BookIcon, href: '/allcourses' },
     { label: 'Progress', icon: BarIcon, href: '/progress' },
     { label: 'Settings', icon: GearIcon, href: '/settings' },
+    { label: 'Profile', icon: UserIcon, href: '/profile' },
 ];
 
 /* ── Sidebar ─────────────────────────────────────── */
@@ -92,7 +95,7 @@ function Sidebar({ userInitials, userName, userTier }: { userInitials: string; u
                 <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white shrink-0">
                     <LogoIcon />
                 </div>
-                LearnAI
+                EduAble
             </Link>
 
             {/* Nav */}
@@ -147,7 +150,7 @@ function MobileTopBar({ userInitials, onMenuToggle, menuOpen }: { userInitials: 
                 <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white">
                     <LogoIcon />
                 </div>
-                <span className="text-base">LearnAI</span>
+                <span className="text-base">EduAble</span>
             </Link>
             <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">

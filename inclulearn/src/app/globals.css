@@ -5,13 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   EduLearn — Shadcn + Tailwind v4
+   EduAble — Shadcn + Tailwind v4
    FIX: Use oklch semantic tokens that respond to data-theme
    ============================================================ */
 :root {
   --radius: 0.625rem;
 
-  /* EduLearn blue shadcn tokens */
+  /* EduAble blue shadcn tokens */
   --background:  oklch(0.97 0.01 240);
   --foreground:  oklch(0.18 0.04 260);
   --card:        oklch(1 0 0);

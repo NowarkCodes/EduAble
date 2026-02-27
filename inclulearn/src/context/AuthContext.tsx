@@ -21,31 +21,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     /* Hydrate from localStorage on mount */
     useEffect(() => {
         try {
-            const storedToken = localStorage.getItem('edulearn_token');
-            const storedUser = localStorage.getItem('edulearn_user');
+            const storedToken = localStorage.getItem('EduAble_token');
+            const storedUser = localStorage.getItem('EduAble_user');
             if (storedToken && storedUser) {
                 setToken(storedToken);
                 setUser(JSON.parse(storedUser));
             }
         } catch {
             // invalid JSON — clear storage
-            localStorage.removeItem('edulearn_token');
-            localStorage.removeItem('edulearn_user');
+            localStorage.removeItem('EduAble_token');
+            localStorage.removeItem('EduAble_user');
         } finally {
             setLoading(false);
         }
     }, []);
 
     const login = (user: AuthUser, token: string) => {
-        localStorage.setItem('edulearn_token', token);
-        localStorage.setItem('edulearn_user', JSON.stringify(user));
+        localStorage.setItem('EduAble_token', token);
+        localStorage.setItem('EduAble_user', JSON.stringify(user));
         setUser(user);
         setToken(token);
     };
 
     const logout = () => {
-        localStorage.removeItem('edulearn_token');
-        localStorage.removeItem('edulearn_user');
+        localStorage.removeItem('EduAble_token');
+        localStorage.removeItem('EduAble_user');
         setUser(null);
         setToken(null);
     };
