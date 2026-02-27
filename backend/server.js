@@ -15,11 +15,11 @@ app.use(cors({
 app.use(express.json());
 
 /* ── Routes ─────────────────────────────────────── */
-app.use('/api/auth',      require('./routes/auth'));
-app.use('/api/profile',   require('./routes/profile'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/profile', require('./routes/profile'));
 app.use('/api/dashboard', require('./routes/dashboard'));
-app.use('/api/courses',   require('./routes/courses'));
-app.use('/api/ngo',       require('./routes/ngo'));
+app.use('/api/courses', require('./routes/courses'));
+app.use('/api/ngo', require('./routes/ngo'));
 
 /* ── Health check ───────────────────────────────── */
 app.get('/api/health', (_req, res) => {
@@ -31,11 +31,8 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-/* ── Global error handler ────────────────────────── */
-app.use((err, _req, res, _next) => {
-  console.error('[ERROR]', err.stack);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-});
+/* ── Centralized error handler ───────────────────── */
+app.use(require('./middleware/errorHandler'));
 
 /* ── MongoDB + Start ─────────────────────────────── */
 const PORT = process.env.PORT || 5000;
