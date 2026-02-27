@@ -3,7 +3,13 @@ const { Storage } = require('@google-cloud/storage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const requireRole = require('../middleware/role');
-const { getStats, updateStats } = require('../controllers/ngoController');
+const {
+  getStats,
+  updateStats,
+  getQuizCompletionByDisability,
+  getAvgScoreByDisability,
+  getA11yModeUsage
+} = require('../controllers/ngoController');
 
 const router = express.Router();
 
@@ -24,6 +30,15 @@ router.get('/stats', getStats);
 
 // Only admin/ngo users can mutate NGO stats
 router.patch('/stats', authMiddleware, requireRole('admin', 'ngo'), updateStats);
+
+
+/* ── NGO ADVANCED ANALYTICS (Requires auth + 'ngo'/'admin' role) ─── */
+const adminOrNgo = [authMiddleware, requireRole('admin', 'ngo')];
+
+router.get('/analytics/quiz-completion', adminOrNgo, getQuizCompletionByDisability);
+router.get('/analytics/avg-score', adminOrNgo, getAvgScoreByDisability);
+router.get('/analytics/a11y-usage', adminOrNgo, getA11yModeUsage);
+
 
 // Endpoint to generate Secure Presigned URLs for direct browser-to-cloud uploads
 router.post('/upload-urls', async (req, res) => {
@@ -73,7 +88,7 @@ router.post('/upload-urls', async (req, res) => {
 router.get('/videos', async (req, res) => {
   try {
     const [files] = await storage.bucket(uploadBucket).getFiles({ prefix: 'uploads/videos/' });
-    
+
     const videos = files.map(file => {
       // Create a direct URL to the public file or use Signed URLs if the bucket is fully private
       // For this hackathon, we'll assume they can be accessed directly or the user will manage access

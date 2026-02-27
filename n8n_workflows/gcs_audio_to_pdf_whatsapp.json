@@ -1,0 +1,484 @@
+{
+    "name": "GCS Audio to PDF WhatsApp",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "gcs-trigger",
+                "responseMode": "onReceived",
+                "options": {}
+            },
+            "id": "node-gcs-trigger",
+            "name": "GCS Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                0,
+                300
+            ],
+            "notes": "Receives Google Cloud Storage Pub/Sub push notification. GCS bucket must be configured to send Pub/Sub notifications to this webhook URL. The event payload includes object name, bucket, metadata, etc."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Validate that the triggering file is an MP3\nconst body = $input.first().json.body || $input.first().json;\nconst message = body.message;\n\nif (!message || !message.data) {\n  throw new Error('Invalid Pub/Sub message format');\n}\n\n// Decode base64-encoded Pub/Sub data\nconst decoded = JSON.parse(Buffer.from(message.data, 'base64').toString('utf-8'));\n\nconst objectName = decoded.name;\nconst bucketName = decoded.bucket;\nconst metadata = decoded.metadata || {};\nconst studentPhone = metadata.studentPhone || '';\nconst parentPhone = metadata.parentPhone || '';\n\nif (!objectName.toLowerCase().endsWith('.mp3')) {\n  throw new Error(`Skipping non-MP3 file: ${objectName}`);\n}\n\nconst baseName = objectName.split('/').pop().replace(/\\.mp3$/i, '');\n\nreturn [{\n  json: {\n    objectName,\n    bucketName,\n    baseName,\n    studentPhone,\n    parentPhone,\n    metadata\n  }\n}];"
+            },
+            "id": "node-validate-filter",
+            "name": "Validate & Filter MP3",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ],
+            "notes": "Decodes Pub/Sub message, extracts file metadata, validates .mp3 extension, and extracts student/parent phone numbers from GCS object metadata."
+        },
+        {
+            "parameters": {
+                "url": "=https://storage.googleapis.com/storage/v1/b/{{ $json.bucketName }}/o/{{ encodeURIComponent($json.objectName) }}?alt=media",
+                "authentication": "predefinedCredentialType",
+                "nodeCredentialType": "googleApi",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "file",
+                            "outputPropertyName": "audioData"
+                        }
+                    }
+                }
+            },
+            "id": "node-download-mp3",
+            "name": "Download MP3 from GCS",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                480,
+                300
+            ],
+            "retryOnFail": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000,
+            "notes": "Downloads the MP3 binary from Google Cloud Storage using the Storage JSON API. Uses GOOGLE_API_KEY for authentication. Binary stored in 'audioData' property.",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Convert binary MP3 data to base64 for Speech-to-Text API\nconst binaryData = $binary.audioData;\nif (!binaryData) {\n  throw new Error('No audio binary data found');\n}\n\nconst base64Audio = binaryData.data;\n\nreturn [{\n  json: {\n    ...$json,\n    base64Audio\n  },\n  binary: $binary\n}];"
+            },
+            "id": "node-prepare-audio",
+            "name": "Prepare Audio Base64",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                720,
+                300
+            ],
+            "notes": "Extracts the binary audio data and converts it to base64 string, as required by the Google Speech-to-Text synchronous recognition API."
+        },
+        {
+            "parameters": {
+                "url": "https://speech.googleapis.com/v1/speech:recognize",
+                "authentication": "predefinedCredentialType",
+                "nodeCredentialType": "googleApi",
+                "method": "POST",
+                "sendBody": true,
+                "contentType": "json",
+                "body": "={\n  \"config\": {\n    \"encoding\": \"MP3\",\n    \"sampleRateHertz\": 16000,\n    \"languageCode\": \"en-US\",\n    \"enableAutomaticPunctuation\": true,\n    \"model\": \"latest_long\"\n  },\n  \"audio\": {\n    \"content\": \"{{ $json.base64Audio }}\"\n  }\n}",
+                "options": {}
+            },
+            "id": "node-speech-to-text",
+            "name": "Google Speech-to-Text",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                960,
+                300
+            ],
+            "retryOnFail": true,
+            "maxTries": 3,
+            "waitBetweenTries": 3000,
+            "notes": "Sends base64-encoded MP3 audio to Google Cloud Speech-to-Text synchronous recognition API. Uses MP3 encoding with en-US language and automatic punctuation. Returns JSON with transcription results.",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract transcript from Speech-to-Text response and format as Markdown\nconst sttResponse = $json;\nconst results = sttResponse.results || [];\n\nif (results.length === 0) {\n  throw new Error('No transcription results returned from Speech-to-Text API');\n}\n\n// Concatenate all transcript alternatives\nconst fullTranscript = results\n  .map(r => r.alternatives[0]?.transcript || '')\n  .join(' ')\n  .trim();\n\nif (!fullTranscript) {\n  throw new Error('Empty transcript returned');\n}\n\n// Build timestamp\nconst now = new Date();\nconst timestamp = now.toLocaleString('en-US', {\n  year: 'numeric', month: 'long', day: 'numeric',\n  hour: '2-digit', minute: '2-digit', timeZoneName: 'short'\n});\n\nconst baseName = $('Validate & Filter MP3').first().json.baseName;\n\n// Format structured Markdown\nconst markdownContent = `# Lecture Transcript\n\n---\n\n**File:** ${baseName}.mp3  \n**Generated:** ${timestamp}  \n**Language:** English (en-US)\n\n---\n\n## Full Transcript\n\n${fullTranscript}\n\n---\n\n*This transcript was automatically generated using Google Cloud Speech-to-Text.*\n`;\n\nreturn [{\n  json: {\n    ...$('Validate & Filter MP3').first().json,\n    fullTranscript,\n    markdownContent,\n    timestamp\n  }\n}];"
+            },
+            "id": "node-format-markdown",
+            "name": "Extract & Format Markdown",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1200,
+                300
+            ],
+            "notes": "Extracts transcript text from all STT result alternatives, builds a structured Markdown document with title, timestamp, file name, and full transcript section. Outputs markdownContent field."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Convert Markdown to basic HTML for PDFEndpoint\nconst md = $json.markdownContent;\n\nconst html = md\n  // h1\n  .replace(/^# (.+)$/gm, '<h1>$1</h1>')\n  // h2\n  .replace(/^## (.+)$/gm, '<h2>$1</h2>')\n  // h3\n  .replace(/^### (.+)$/gm, '<h3>$1</h3>')\n  // Bold\n  .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')\n  // Italic\n  .replace(/\\*(.+?)\\*/g, '<em>$1</em>')\n  // Horizontal rule\n  .replace(/^---$/gm, '<hr/>')\n  // Line breaks (two spaces + newline)\n  .replace(/  \\n/g, '<br/>')\n  // Paragraphs\n  .replace(/\\n\\n/g, '</p><p>')\n  .trim();\n\nconst wrappedHtml = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: Georgia, serif; margin: 40px; color: #222; line-height: 1.7; }\n    h1 { color: #1a1a2e; border-bottom: 2px solid #e94560; padding-bottom: 8px; }\n    h2 { color: #16213e; margin-top: 28px; }\n    hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }\n    p { margin: 12px 0; }\n    em { color: #555; font-size: 0.9em; }\n    strong { color: #333; }\n  </style>\n</head>\n<body>\n<p>${html}</p>\n</body>\n</html>`;\n\nreturn [{\n  json: {\n    ...$json,\n    htmlContent: wrappedHtml\n  }\n}];"
+            },
+            "id": "node-markdown-to-html",
+            "name": "Convert Markdown to HTML",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1440,
+                300
+            ],
+            "notes": "Converts the structured Markdown to clean, styled HTML. Wraps in a full HTML document with embedded CSS suitable for PDF rendering. Headings, bold, italic, horizontal rules, and paragraph breaks are all converted."
+        },
+        {
+            "parameters": {
+                "url": "https://api.pdfendpoint.com/v1/convert",
+                "method": "POST",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer pdfe_live_90cc0f88ae7e78ee7571ffb360ce548011c2"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "contentType": "json",
+                "body": "={\n  \"html\": {{ JSON.stringify($json.htmlContent) }},\n  \"paper\": \"A4\",\n  \"orientation\": \"portrait\",\n  \"margin_top\": \"20mm\",\n  \"margin_bottom\": \"20mm\",\n  \"margin_left\": \"15mm\",\n  \"margin_right\": \"15mm\"\n}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "file",
+                            "outputPropertyName": "pdfData"
+                        }
+                    }
+                }
+            },
+            "id": "node-generate-pdf",
+            "name": "Generate PDF via PDFEndpoint",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1680,
+                300
+            ],
+            "retryOnFail": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000,
+            "notes": "Sends styled HTML to PDFEndpoint API to generate a PDF. Uses PDFENDPOINT_API_KEY for auth. Returns PDF binary as 'pdfData'. Paper size A4 with standard margins.",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "url": "=https://storage.googleapis.com/upload/storage/v1/b/{{ $('Validate & Filter MP3').first().json.bucketName }}/o?uploadType=media&name={{ encodeURIComponent('pdf-exports/' + $('Validate & Filter MP3').first().json.baseName + '.pdf') }}&predefinedAcl=publicRead",
+                "method": "POST",
+                "authentication": "predefinedCredentialType",
+                "nodeCredentialType": "googleApi",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/pdf"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "contentType": "binaryData",
+                "inputDataFieldName": "pdfData",
+                "options": {}
+            },
+            "id": "node-upload-pdf-gcs",
+            "name": "Upload PDF to GCS",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1920,
+                300
+            ],
+            "retryOnFail": true,
+            "maxTries": 3,
+            "waitBetweenTries": 3000,
+            "notes": "Uploads PDF binary to Google Cloud Storage under the 'pdf-exports/' folder. Sets ACL to 'publicRead' so the file is publicly accessible via the standard GCS public URL. The object name is: pdf-exports/{baseName}.pdf",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Build the public GCS URL for the uploaded PDF\nconst bucket = $('Validate & Filter MP3').first().json.bucketName;\nconst baseName = $('Validate & Filter MP3').first().json.baseName;\nconst objectPath = `pdf-exports/${baseName}.pdf`;\nconst publicUrl = `https://storage.googleapis.com/${bucket}/${encodeURIComponent(objectPath)}`;\n\nconst studentPhone = $('Validate & Filter MP3').first().json.studentPhone;\nconst parentPhone = $('Validate & Filter MP3').first().json.parentPhone;\n\nif (!studentPhone && !parentPhone) {\n  throw new Error('No student or parent phone number found in GCS object metadata');\n}\n\nreturn [{\n  json: {\n    ...$('Validate & Filter MP3').first().json,\n    publicUrl,\n    pdfFileName: `${baseName}.pdf`,\n    recipients: [\n      ...(studentPhone ? [{ phone: studentPhone, label: 'student' }] : []),\n      ...(parentPhone ? [{ phone: parentPhone, label: 'parent' }] : [])\n    ]\n  }\n}];"
+            },
+            "id": "node-build-url",
+            "name": "Build PDF Public URL",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2160,
+                300
+            ],
+            "notes": "Constructs the public GCS URL for the uploaded PDF and assembles the list of WhatsApp recipients (student and parent) from the GCS object metadata. Validates that at least one phone number is present."
+        },
+        {
+            "parameters": {
+                "fieldToSplitOut": "recipients",
+                "options": {}
+            },
+            "id": "node-split-recipients",
+            "name": "Split Recipients",
+            "type": "n8n-nodes-base.splitOut",
+            "typeVersion": 1,
+            "position": [
+                2400,
+                300
+            ],
+            "notes": "Splits the recipients array into individual items so the WhatsApp message can be sent separately to each recipient (student and parent)."
+        },
+        {
+            "parameters": {
+                "url": "=https://graph.facebook.com/v19.0/{{ $env.META_PHONE_NUMBER_ID }}/messages",
+                "method": "POST",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.META_WHATSAPP_TOKEN }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "contentType": "json",
+                "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.recipients.phone }}\",\n  \"type\": \"document\",\n  \"document\": {\n    \"link\": \"{{ $json.publicUrl }}\",\n    \"caption\": \"Your transcript PDF is ready. Please download and review your lecture transcript: {{ $json.pdfFileName }}\",\n    \"filename\": \"{{ $json.pdfFileName }}\"\n  }\n}",
+                "options": {}
+            },
+            "id": "node-send-whatsapp",
+            "name": "Send WhatsApp Document",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2640,
+                300
+            ],
+            "retryOnFail": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000,
+            "notes": "Sends a WhatsApp document message via Meta Cloud API (Graph API v19). Sends the PDF as a document with a caption. Uses META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID env vars. Sent to each recipient individually via SplitOut.",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Error handler: log all error details without crashing the workflow\nconst errorData = $input.first();\nconst errorMessage = errorData.json.error?.message || JSON.stringify(errorData.json);\nconst nodeName = $execution.id;\n\nconsole.error(`[EduAble Workflow Error] Node: ${nodeName} | Error: ${errorMessage}`);\n\n// Return structured error log\nreturn [{\n  json: {\n    status: 'error',\n    workflowName: 'GCS Audio to PDF WhatsApp',\n    errorMessage,\n    errorNode: nodeName,\n    timestamp: new Date().toISOString(),\n    inputData: errorData.json\n  }\n}];"
+            },
+            "id": "node-error-handler",
+            "name": "Error Handler",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2640,
+                560
+            ],
+            "notes": "Catches errors from any upstream node connected via error outputs. Logs structured error data including the failing node name, error message, timestamp, and input context. Does not re-throw, preventing workflow crash."
+        }
+    ],
+    "connections": {
+        "GCS Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Validate & Filter MP3",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Validate & Filter MP3": {
+            "main": [
+                [
+                    {
+                        "node": "Download MP3 from GCS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Download MP3 from GCS": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Audio Base64",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ],
+            "error": [
+                [
+                    {
+                        "node": "Error Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Audio Base64": {
+            "main": [
+                [
+                    {
+                        "node": "Google Speech-to-Text",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Speech-to-Text": {
+            "main": [
+                [
+                    {
+                        "node": "Extract & Format Markdown",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ],
+            "error": [
+                [
+                    {
+                        "node": "Error Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract & Format Markdown": {
+            "main": [
+                [
+                    {
+                        "node": "Convert Markdown to HTML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Convert Markdown to HTML": {
+            "main": [
+                [
+                    {
+                        "node": "Generate PDF via PDFEndpoint",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Generate PDF via PDFEndpoint": {
+            "main": [
+                [
+                    {
+                        "node": "Upload PDF to GCS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ],
+            "error": [
+                [
+                    {
+                        "node": "Error Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Upload PDF to GCS": {
+            "main": [
+                [
+                    {
+                        "node": "Build PDF Public URL",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ],
+            "error": [
+                [
+                    {
+                        "node": "Error Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build PDF Public URL": {
+            "main": [
+                [
+                    {
+                        "node": "Split Recipients",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Split Recipients": {
+            "main": [
+                [
+                    {
+                        "node": "Send WhatsApp Document",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send WhatsApp Document": {
+            "main": [],
+            "error": [
+                [
+                    {
+                        "node": "Error Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "saveManualExecutions": true,
+        "callerPolicy": "workflowsFromSameOwner",
+        "errorWorkflow": "",
+        "timezone": "Asia/Kolkata"
+    },
+    "staticData": null,
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "eduable-n8n-instance"
+    },
+    "pinData": {},
+    "versionId": "1.0.0",
+    "triggerCount": 1,
+    "tags": [
+        {
+            "name": "EduAble"
+        },
+        {
+            "name": "audio-pipeline"
+        },
+        {
+            "name": "production"
+        }
+    ]
+}
