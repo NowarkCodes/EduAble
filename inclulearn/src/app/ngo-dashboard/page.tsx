@@ -4,9 +4,17 @@ import { useEffect, useState, useRef } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import Dropdown from '@/components/Dropdown';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import DashboardLayout, { NavItemType } from '@/components/DashboardLayout';
+import { LayoutDashboard, Video, Library, Settings, BookOpen } from 'lucide-react';
+
 
 export default function NgoDashboard() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'video-upload' | 'video-list' | 'settings'>('dashboard');
+  const { user, loading, token } = useAuth();
+  const router = useRouter();
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'course-creation' | 'video-upload' | 'video-list' | 'settings'>('dashboard');
   const [stats, setStats] = useState({
     totalUsers: 0,
     onboardedUsers: 0,
@@ -27,6 +35,25 @@ export default function NgoDashboard() {
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<any>(null);
+
+  // Course Creation States
+  const [courseForm, setCourseForm] = useState({
+    title: '',
+    description: '',
+    category: '',
+    level: 'Beginner',
+    thumbnail: '',
+  });
+  const [selectedVideos, setSelectedVideos] = useState<any[]>([]);
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
+  const [courseCreationStatus, setCourseCreationStatus] = useState('');
+
+  // Auth Guard
+  useEffect(() => {
+    if (!loading && (!user || (user.role !== 'ngo' && user.role !== 'admin'))) {
+      router.push('/ngo');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     ffmpegRef.current = new FFmpeg();
@@ -172,9 +199,9 @@ export default function NgoDashboard() {
       .catch(err => console.error('Error fetching dashboard stats:', err));
   }, []);
 
-  // Fetch Videos when Video List Tab is active
+  // Fetch Videos when Video List Tab or Course Creation is active
   useEffect(() => {
-    if (activeTab === 'video-list') {
+    if (activeTab === 'video-list' || activeTab === 'course-creation') {
       setIsLoadingVideos(true);
       fetch('http://localhost:5000/api/ngo/videos')
         .then(res => res.json())
@@ -192,83 +219,85 @@ export default function NgoDashboard() {
     }
   }, [activeTab]);
 
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseForm.title || !courseForm.category || selectedVideos.length === 0) {
+      setCourseCreationStatus('Please fill all required fields and select at least one video.');
+      return;
+    }
+
+    setIsCreatingCourse(true);
+    setCourseCreationStatus('Creating course...');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/ngo/courses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || document.cookie.split('EduAble_token=')[1]?.split(';')[0]}`
+        },
+        body: JSON.stringify({
+          ...courseForm,
+          videos: selectedVideos
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create course');
+      }
+
+      setCourseCreationStatus('✅ Course created successfully!');
+      setCourseForm({ title: '', description: '', category: '', level: 'Beginner', thumbnail: '' });
+      setSelectedVideos([]);
+
+      // Clear status after a while
+      setTimeout(() => setCourseCreationStatus(''), 5000);
+    } catch (err: any) {
+      setCourseCreationStatus('❌ Error: ' + err.message);
+    } finally {
+      setIsCreatingCourse(false);
+    }
+  };
+
+  // Prevent flash of content while checking auth
+  if (loading || !user || (user.role !== 'ngo' && user.role !== 'admin')) {
+    return (
+      <div className="min-h-screen bg-[#f4f7fe] flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-[#1a56db]/20 border-t-[#1a56db] rounded-full"></div>
+      </div>
+    );
+  }
+
+  const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'N';
+  const displayName = user?.name || 'NGO Partner';
+
+  const ngoNavItems: NavItemType[] = [
+    { label: 'Dashboard', icon: LayoutDashboard, href: '#', isActive: activeTab === 'dashboard', onClick: () => setActiveTab('dashboard') },
+    { label: 'Create Course', icon: BookOpen, href: '#', isActive: activeTab === 'course-creation', onClick: () => setActiveTab('course-creation') },
+    { label: 'Video Upload', icon: Video, href: '#', isActive: activeTab === 'video-upload', onClick: () => setActiveTab('video-upload') },
+    { label: 'Video Library', icon: Library, href: '#', isActive: activeTab === 'video-list', onClick: () => setActiveTab('video-list') },
+    { label: 'Settings', icon: Settings, href: '#', isActive: activeTab === 'settings', onClick: () => setActiveTab('settings') },
+  ];
+
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-[#f4f7fe] text-[#2b3674] font-sans">
-      {/* Sidebar */}
-      <aside className="w-full lg:w-[250px] bg-white p-4 lg:py-8 lg:px-6 flex flex-col border-b lg:border-b-0 lg:border-r border-[#e0e5f2] shadow-[4px_0_24px_rgba(112,144,176,0.08)] shrink-0">
-        <div className="text-2xl font-extrabold text-[#1a56db] mb-4 lg:mb-10 text-center tracking-tight">
-          EduAble NGO
-        </div>
-        <nav className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible no-scrollbar pb-2 lg:pb-0">
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'dashboard'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-              }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}
-            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">📊</span> Dashboard
-          </a>
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'video-upload'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-              }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('video-upload'); }}
-            aria-current={activeTab === 'video-upload' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">📹</span> Video Upload
-          </a>
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'video-list'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-              }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('video-list'); }}
-            aria-current={activeTab === 'video-list' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">📂</span> Video Library
-          </a>
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'settings'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-              }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}
-            aria-current={activeTab === 'settings' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">⚙️</span> Settings
-          </a>
-        </nav>
-      </aside>
+    <DashboardLayout
+      userInitials={initials}
+      userName={displayName}
+      userTier="NGO Partner Account"
+      navItems={ngoNavItems}
+    >
+
 
       {/* Main Content */}
       <main className="flex-1 p-6 lg:p-12 flex flex-col gap-8 overflow-y-auto">
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 lg:gap-0">
-          <h1 className="text-3xl font-bold text-[#2b3674] m-0">Welcome back, Partner!</h1>
-          <div className="flex items-center gap-6 w-full justify-end lg:w-auto">
-            <div
-              className="text-xl cursor-pointer bg-white p-2.5 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.05)] transition-transform duration-200 hover:scale-110 flex items-center justify-center h-12 w-12 leading-none"
-              aria-label="Notifications"
-              role="button"
-              tabIndex={0}
-            >
-              🔔
-            </div>
-            <div
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1a56db] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xl shadow-[0_4px_12px_rgba(26,86,219,0.3)] cursor-pointer transition-transform duration-200 hover:scale-105 shrink-0"
-              aria-label="User Profile"
-              role="button"
-              tabIndex={0}
-            >
-              N
-            </div>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-none mb-2">
+            Welcome back, Partner!
+          </h1>
+          <p className="text-slate-500 text-base">
+            Manage your inclusive educational content and view learner statistics.
+          </p>
         </header>
 
         {activeTab === 'dashboard' && (
@@ -360,6 +389,155 @@ export default function NgoDashboard() {
           </>
         )}
 
+        {activeTab === 'course-creation' && (
+          <section
+            className="bg-white p-6 lg:p-10 rounded-[20px] shadow-[0_4px_24px_rgba(112,144,176,0.08)] mt-2 lg:mt-4"
+            aria-labelledby="course-creation-heading"
+          >
+            <h2 id="course-creation-heading" className="text-2xl font-bold text-[#2b3674] mb-2">
+              Create a New Course
+            </h2>
+            <p className="text-[#a3aed1] text-base mb-8">
+              Bundle your uploaded videos into structured courses for learners.
+            </p>
+
+            <form className="flex flex-col gap-6" onSubmit={handleCreateCourse}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Course Metadata */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-[#2b3674] text-sm">Course Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={courseForm.title}
+                      onChange={e => setCourseForm({ ...courseForm, title: e.target.value })}
+                      placeholder="e.g. Basics of Programming"
+                      className="p-4 rounded-xl border border-[#e0e5f2] bg-[#f4f7fe] focus:bg-white text-base text-[#2b3674] outline-none transition-all duration-200 focus:border-[#1a56db]"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-[#2b3674] text-sm">Category *</label>
+                    <select
+                      required
+                      value={courseForm.category}
+                      onChange={e => setCourseForm({ ...courseForm, category: e.target.value })}
+                      className="p-4 rounded-xl border border-[#e0e5f2] bg-[#f4f7fe] focus:bg-white text-base text-[#2b3674] outline-none transition-all duration-200 focus:border-[#1a56db]"
+                    >
+                      <option value="">Select a category...</option>
+                      <option value="Mathematics">Mathematics</option>
+                      <option value="Sciences">Sciences</option>
+                      <option value="Language">Language</option>
+                      <option value="Life Skills">Life Skills</option>
+                      <option value="Technology">Technology</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-[#2b3674] text-sm">Target Level</label>
+                    <select
+                      value={courseForm.level}
+                      onChange={e => setCourseForm({ ...courseForm, level: e.target.value })}
+                      className="p-4 rounded-xl border border-[#e0e5f2] bg-[#f4f7fe] focus:bg-white text-base text-[#2b3674] outline-none transition-all duration-200 focus:border-[#1a56db]"
+                    >
+                      <option value="Beginner">Beginner</option>
+                      <option value="Foundations">Foundations</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Advanced">Advanced</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-[#2b3674] text-sm">Thumbnail Image URL</label>
+                    <input
+                      type="url"
+                      value={courseForm.thumbnail}
+                      onChange={e => setCourseForm({ ...courseForm, thumbnail: e.target.value })}
+                      placeholder="https://..."
+                      className="p-4 rounded-xl border border-[#e0e5f2] bg-[#f4f7fe] focus:bg-white text-base text-[#2b3674] outline-none transition-all duration-200 focus:border-[#1a56db]"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-[#2b3674] text-sm">Short Description *</label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={courseForm.description}
+                      onChange={e => setCourseForm({ ...courseForm, description: e.target.value })}
+                      placeholder="What will learners achieve in this course?"
+                      className="p-4 rounded-xl border border-[#e0e5f2] bg-[#f4f7fe] focus:bg-white text-base text-[#2b3674] outline-none resize-none transition-all duration-200 focus:border-[#1a56db]"
+                    />
+                  </div>
+                </div>
+
+                {/* Video Selection Grid */}
+                <div className="flex flex-col gap-4">
+                  <label className="font-semibold text-[#2b3674] text-sm">
+                    Select Videos to Include ({selectedVideos.length} selected)
+                  </label>
+                  <div className="border border-[#e0e5f2] rounded-xl bg-[#f4f7fe] p-4 h-[400px] overflow-y-auto">
+                    {isLoadingVideos ? (
+                      <div className="text-center text-[#a3aed1] py-10">Loading videos from cloud...</div>
+                    ) : cloudVideos.length === 0 ? (
+                      <div className="text-center text-[#a3aed1] py-10">
+                        No videos found. Go to Video Upload first.
+                      </div>
+                    ) : (
+                      <ul className="space-y-3 m-0 p-0 list-none">
+                        {cloudVideos.map((video, idx) => {
+                          const isSelected = selectedVideos.find(v => v.url === video.url);
+                          // Clean up name for display
+                          let displayTitle = video.name;
+                          if (video.name.includes('-')) {
+                            const parts = video.name.split('-');
+                            parts.shift();
+                            displayTitle = parts.join('-');
+                          }
+
+                          return (
+                            <li key={idx} className={`p-3 rounded-lg border flex items-center gap-3 cursor-pointer transition-colors ${isSelected ? 'border-[#1a56db] bg-[#1a56db]/5' : 'border-transparent bg-white hover:border-[#e0e5f2]'}`} onClick={() => {
+                              if (isSelected) {
+                                setSelectedVideos(selectedVideos.filter(v => v.url !== video.url));
+                              } else {
+                                setSelectedVideos([...selectedVideos, { name: displayTitle, url: video.url, cloudPath: video.cloudPath, duration: 300 }]);
+                              }
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={!!isSelected}
+                                readOnly
+                                className="w-4 h-4 rounded border-[#e0e5f2] text-[#1a56db] focus:ring-[#1a56db]"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-[#2b3674] truncate m-0">{displayTitle}</p>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                  {courseCreationStatus && (
+                    <div className={`p-3 rounded-xl text-sm font-semibold border ${courseCreationStatus.includes('✅') ? 'bg-[#f0fdf4] text-[#16a34a] border-[#bbf7d0]' : courseCreationStatus.includes('❌') ? 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca]' : 'bg-[#e0e7ff] text-[#4f46e5] border-[#c7d2fe]'}`}>
+                      {courseCreationStatus}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isCreatingCourse || selectedVideos.length === 0}
+                    className="mt-auto w-full text-white border-0 p-4 rounded-xl font-semibold text-base transition-all duration-200 bg-[#1a56db] hover:shadow-[0_4px_12px_rgba(26,86,219,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingCourse ? 'Creating Course...' : 'Create Course'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </section>
+        )}
+
         {activeTab === 'video-upload' && (
           <section
             className="bg-white p-6 lg:p-10 rounded-[20px] shadow-[0_4px_24px_rgba(112,144,176,0.08)] mt-2 lg:mt-4"
@@ -425,7 +603,7 @@ export default function NgoDashboard() {
                       onChange={handleFileSelect}
                     />
                     <div
-                      className={`border-2 border-dashed ${videoFile ? 'border-[#05cd99] bg-[#05cd99]/[0.03]' : 'border-[#1a56db] bg-[#1a56db]/[0.03]'} rounded-2xl p-8 lg:p-12 text-center cursor-pointer transition-all duration-200 hover:bg-[#1a56db]/[0.06] hover:-translate-y-0.5`}
+                      className={`border-2 border-dashed ${videoFile ? 'border-[#05cd99] bg-[#05cd99]/3' : 'border-[#1a56db] bg-[#1a56db]/[0.03]'} rounded-2xl p-8 lg:p-12 text-center cursor-pointer transition-all duration-200 hover:bg-[#1a56db]/[0.06] hover:-translate-y-0.5`}
                       role="button"
                       tabIndex={0}
                       onClick={() => fileInputRef.current?.click()}
@@ -636,6 +814,6 @@ export default function NgoDashboard() {
           </section>
         )}
       </main>
-    </div>
+    </DashboardLayout>
   );
 }

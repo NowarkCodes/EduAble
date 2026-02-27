@@ -17,6 +17,7 @@ interface ExploreCourse {
     started: boolean;
     tags: string[];
     image: string;
+    videos?: string[];
 }
 
 function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -137,6 +138,23 @@ function CourseCard({ course }: { course: ExploreCourse }) {
                         </div>
                     )}
 
+                    {/* Showcased Videos from NGO Dashboard */}
+                    {course.videos && course.videos.length > 0 && (
+                        <div className="mb-4">
+                            <p className="text-xs font-bold text-slate-700 mb-2">Included Lessons:</p>
+                            <ul className="text-sm text-slate-600 space-y-1.5 pl-4 m-0 list-disc">
+                                {course.videos.slice(0, 3).map((videoTitle, i) => (
+                                    <li key={i} className="truncate">{videoTitle}</li>
+                                ))}
+                                {course.videos.length > 3 && (
+                                    <li className="text-slate-400 italic text-xs list-none -ml-4">
+                                        + {course.videos.length - 3} more
+                                    </li>
+                                )}
+                            </ul>
+                        </div>
+                    )}
+
                     <Link
                         href={`/courses/${course.id}`}
                         className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-blue-700 transition-colors relative z-10 text-sm"
@@ -158,7 +176,12 @@ export default function ExploreCoursesPage() {
     const { user, token } = useAuth();
     const [courses, setCourses] = useState<ExploreCourse[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [selectedLevel, setSelectedLevel] = useState('All');
     const [filtersOpen, setFiltersOpen] = useState(false);
+
 
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [difficultyFilter, setDifficultyFilter] = useState('Difficulty');
@@ -169,17 +192,23 @@ export default function ExploreCoursesPage() {
 
     const initials = (user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
 
+    // Derive unique categories from live data
+    const categories = ['All', ...Array.from(new Set(courses.map(c => c.category).filter(Boolean)))];
+
     const fetchExplore = useCallback(async () => {
         try {
+            setError('');
             const res = await fetch('http://localhost:5000/api/courses/explore', {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {
                 const data = await res.json();
                 setCourses(data.courses ?? []);
+            } else {
+                setError('Server returned an error. Please try again.');
             }
-        } catch (e) {
-            console.error(e);
+        } catch {
+            setError('Could not connect to server. Is the backend running?');
         } finally {
             setLoading(false);
         }
@@ -189,6 +218,16 @@ export default function ExploreCoursesPage() {
         if (token) fetchExplore();
         else setLoading(false);
     }, [token, fetchExplore]);
+
+    // Derived filtered list
+    const filteredCourses = courses.filter(c => {
+        const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.instructor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.category?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = selectedCategory === 'All' || c.category === selectedCategory;
+        const matchesLevel = selectedLevel === 'All' || c.level === selectedLevel;
+        return matchesSearch && matchesCategory && matchesLevel;
+    });
 
     return (
         <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
@@ -205,64 +244,88 @@ export default function ExploreCoursesPage() {
                     </p>
                 </div>
 
-                {/* ── Filters Row ── */}
-                <div className="mb-6 sm:mb-8 space-y-3">
-                    {/* Search + filter toggle row */}
-                    <div className="flex gap-2 sm:gap-3">
-                        {/* Search */}
-                        <div className="relative flex-1">
-                            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 pointer-events-none" />
-                            <input
-                                type="text"
-                                placeholder="Search courses…"
-                                className="w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 rounded-2xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-sm"
-                            />
-                        </div>
-
-                        {/* Selects — visible on md+, hidden on mobile (shown in collapsed panel) */}
-                        <div className="hidden md:flex gap-3">
-                            <Dropdown value={categoryFilter} onChange={setCategoryFilter} options={['All Categories', 'AI Basics', 'Prompt Eng', 'Ethics']} className="w-40" />
-                            <Dropdown value={difficultyFilter} onChange={setDifficultyFilter} options={['Difficulty', 'Beginner', 'Intermediate', 'Advanced']} className="w-36" />
-                        </div>
-
-                        {/* More Filters button — always visible */}
-                        <button
-                            onClick={() => setFiltersOpen(prev => !prev)}
-                            aria-expanded={filtersOpen}
-                            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-bold text-sm border transition-colors shadow-sm shrink-0 ${filtersOpen ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100'}`}
-                        >
-                            <FilterIcon className="w-4 h-4 shrink-0" />
-                            <span className="hidden sm:inline">Filters</span>
-                        </button>
+                {/* Filters Row */}
+                <div className="flex flex-col md:flex-row gap-4 mb-8">
+                    <div className="relative flex-1">
+                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="Search by title, instructor, or category…"
+                            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-sm"
+                        />
                     </div>
 
-                    {/* Collapsible filter panel — selects on mobile, extra filters on md+ */}
-                    {filtersOpen && (
-                        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                            {/* Always show on mobile; hidden on md+ (already in row above) */}
-                            <Dropdown value={categoryFilter} onChange={setCategoryFilter} options={['All Categories', 'AI Basics', 'Prompt Eng', 'Ethics']} className="md:hidden" />
-                            <Dropdown value={difficultyFilter} onChange={setDifficultyFilter} options={['Difficulty', 'Beginner', 'Intermediate', 'Advanced']} className="md:hidden" />
+                    <div className="flex gap-3">
+                        <select
+                            value={selectedCategory}
+                            onChange={e => setSelectedCategory(e.target.value)}
+                            className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none cursor-pointer"
+                        >
+                            {categories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>)}
+                        </select>
 
-                            {/* Extra filters always in panel */}
-                            <Dropdown value={languageFilter} onChange={setLanguageFilter} options={['Language', 'English', 'Hindi', 'Spanish']} />
-                            <Dropdown value={durationFilter} onChange={setDurationFilter} options={['Duration', 'Under 2h', '2–5h', '5h+']} />
-                            <Dropdown value={formatFilter} onChange={setFormatFilter} options={['Format', 'Video', 'Text', 'Interactive']} />
-                            <Dropdown value={accessibilityFilter} onChange={setAccessibilityFilter} options={['Accessibility', 'Captions', 'Screen Reader', 'Sign Language']} />
+                        <select
+                            value={selectedLevel}
+                            onChange={e => setSelectedLevel(e.target.value)}
+                            className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none cursor-pointer"
+                        >
+                            {['All', 'Beginner', 'Foundations', 'Intermediate', 'Advanced'].map(l => (
+                                <option key={l} value={l}>{l === 'All' ? 'All Levels' : l}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+                    {loading ? (
+                        Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="animate-pulse bg-white border border-slate-200 rounded-2xl h-96" />
+                        ))
+                    ) : error ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20 text-center gap-4">
+                            <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                            </div>
+                            <p className="font-bold text-lg text-slate-700">Could not load courses</p>
+                            <p className="text-sm text-slate-400 max-w-xs">{error}</p>
+                            <button
+                                onClick={() => { setLoading(true); fetchExplore(); }}
+                                className="px-6 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors"
+                            >
+                                Retry
+                            </button>
                         </div>
+                    ) : filteredCourses.length === 0 ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20 text-center text-slate-400 gap-4">
+                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            {courses.length === 0 ? (
+                                <>
+                                    <p className="font-bold text-lg text-slate-600">No courses yet</p>
+                                    <p className="text-sm max-w-xs">An NGO hasn&apos;t created any courses yet. Check back soon!</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="font-bold text-lg text-slate-600">No results found</p>
+                                    <p className="text-sm">Try adjusting your search or filters.</p>
+                                    <button onClick={() => { setSearchQuery(''); setSelectedCategory('All'); setSelectedLevel('All'); }} className="text-blue-600 font-bold text-sm hover:underline">Clear filters</button>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        filteredCourses.map(course => (
+                            <CourseCard key={course.id} course={course} />
+                        ))
                     )}
                 </div>
 
-                {/* ── Course Grid ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 mb-12 sm:mb-14 md:mb-16">
-                    {loading
-                        ? Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="animate-pulse bg-white border border-slate-200 rounded-2xl h-80 sm:h-96" />
-                        ))
-                        : courses.map(course => (
-                            <CourseCard key={course.id} course={course} />
-                        ))
-                    }
-                </div>
+
 
                 {/* ── Learning Your Way ── */}
                 <div className="bg-slate-50 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 border border-slate-200">
@@ -321,6 +384,6 @@ export default function ExploreCoursesPage() {
                 </div>
 
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 }

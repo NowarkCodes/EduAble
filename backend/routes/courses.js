@@ -8,6 +8,7 @@ const {
   enrollCourse,
   completeLesson,
 } = require('../controllers/coursesController');
+const Course = require('../models/Course'); // Added for the explore route
 
 const router = express.Router();
 
@@ -20,68 +21,38 @@ router.get('/', listCourses);
 
 /* ────────────────────────────────────────────────────────────
    GET /api/courses/explore (protected)
-   Returns dummy data for Explore Courses directory.
+   Returns real data for Explore Courses directory.
 ──────────────────────────────────────────────────────────── */
 router.get('/explore', async (req, res) => {
   try {
-    const exploreCourses = [
+    const exploreCourses = await Course.aggregate([
+      { $match: { isPublished: true } },
+      { $sort: { createdAt: -1 } },
+      { $limit: 20 },
       {
-        id: 'gen-ai-a11y',
-        title: 'Intro to Generative AI & Accessibility',
-        instructor: 'Dr. Sarah Chen',
-        category: 'AI Basics',
-        level: 'Beginner',
-        progress: 65,
-        started: true,
-        tags: ['Screen Reader Optimized', 'Captions'],
-        image: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=600&auto=format&fit=crop'
-      },
-      {
-        id: 'adv-prompt-eng',
-        title: 'Advanced Prompt Engineering',
-        instructor: 'Marcus Thorne',
-        category: 'Prompt Eng',
-        level: 'Intermediate',
-        progress: 12,
-        started: true,
-        tags: ['Keyboard Navigable'],
-        image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=600&auto=format&fit=crop'
-      },
-      {
-        id: 'ethics-llm',
-        title: 'Ethics in Large Language Models',
-        instructor: 'Elena Rodriguez',
-        category: 'Ethics',
-        level: 'Advanced',
-        progress: 0,
-        started: false,
-        tags: ['Captions', 'Screen Reader Optimized'],
-        image: 'https://images.unsplash.com/photo-1633534571434-6eaecf3d24ab?q=80&w=600&auto=format&fit=crop'
-      },
-      {
-        id: 'a11y-web-design',
-        title: 'Accessibility in Web Design',
-        instructor: 'Alex Rivera',
-        category: 'Design',
-        level: 'Intermediate',
-        progress: 0,
-        started: false,
-        tags: ['Screen Reader Optimized', 'Keyboard Navigable'],
-        image: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop'
-      },
-      {
-        id: 'ai-learning-strategies',
-        title: 'AI-Assisted Learning Strategies',
-        instructor: 'Maya Thompson',
-        category: 'Learning',
-        level: 'Beginner',
-        progress: 0,
-        started: false,
-        tags: ['Captions', 'Screen Reader Optimized'],
-        image: 'https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?q=80&w=600&auto=format&fit=crop'
+        $lookup: {
+          from: 'lessons',
+          localField: '_id',
+          foreignField: 'courseId',
+          as: 'lessons'
+        }
       }
-    ];
-    res.json({ courses: exploreCourses });
+    ]);
+
+    const courses = exploreCourses.map(c => ({
+        id: c._id.toString(),
+        title: c.title,
+        instructor: c.instructorName || 'EduAble Instructor',
+        category: c.category,
+        level: c.level,
+        progress: 0,
+        started: false,
+        tags: c.accessibilityTags || [],
+        image: c.thumbnail || 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=600&auto=format&fit=crop',
+        videos: c.lessons ? c.lessons.sort((a,b)=>a.order-b.order).map(l => l.title) : []
+    }));
+
+    res.json({ courses });
   } catch (err) {
     console.error('[courses/explore]', err);
     res.status(500).json({ error: 'Could not load explore courses.' });

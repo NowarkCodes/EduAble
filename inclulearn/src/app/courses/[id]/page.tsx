@@ -1,56 +1,70 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
-import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRightIcon, CheckCircleIcon } from 'lucide-react';
 
-function PlayIcon() {
+const BACKEND = 'http://localhost:5000';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Lesson {
+    id: string;
+    title: string;
+    order: number;
+    duration: number;
+    videoUrl: string | null;
+    notesMarkdown?: string;
+    completed?: boolean;
+    transcript?: string;
+}
+
+interface CourseData {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    level: string;
+    instructorName: string;
+    thumbnail: string | null;
+    accessibilityTags: string[];
+    totalLessons: number;
+    totalDuration: number;
+}
+
+interface EnrollmentData {
+    status: string;
+    progressPercentage: number;
+    enrolledAt: string;
+}
+
+// ─── Helper: format seconds ──────────────────────────────────────────────────
+
+function formatDuration(secs: number) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function FileTextIcon() {
     return (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
     );
 }
 
-function PauseIcon() {
+function LightningIcon() {
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-        </svg>
-    );
-}
-
-function VolumeIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.03zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-        </svg>
-    );
-}
-
-function CCIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z" />
-        </svg>
-    );
-}
-
-function SettingsIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
-        </svg>
-    );
-}
-
-function FullscreenIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
     );
 }
@@ -65,7 +79,7 @@ function DownloadIcon() {
     );
 }
 
-function SearchIcon() {
+function SearchInputIcon() {
     return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
@@ -74,25 +88,24 @@ function SearchIcon() {
     );
 }
 
-function FileTextIcon() {
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+
+function Skeleton() {
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-            <polyline points="10 9 9 9 8 9" />
-        </svg>
+        <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-slate-200 rounded-xl w-2/3" />
+            <div className="h-4 bg-slate-200 rounded w-1/3" />
+            <div className="aspect-video bg-slate-200 rounded-2xl" />
+            <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                    <div key={i} className="h-14 bg-slate-100 rounded-xl" />
+                ))}
+            </div>
+        </div>
     );
 }
 
-function LightningIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-        </svg>
-    );
-}
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const courseItems = [
     { num: 1, title: 'Introduction to ARIA', time: '10:20', status: 'completed' },
@@ -110,241 +123,449 @@ const transcriptItems = [
 ];
 
 export default function CourseDetailPage() {
-    const { user } = useAuth();
-    const initials = (user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+    const { id } = useParams<{ id: string }>();
+    const { user, token } = useAuth();
+    const initials = (user?.name ?? 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
-    // Transcript panel open/close on mobile
-    const [transcriptOpen, setTranscriptOpen] = useState(false);
+
+    const [course, setCourse] = useState<CourseData | null>(null);
+    const [lessons, setLessons] = useState<Lesson[]>([]);
+    const [enrollment, setEnrollment] = useState<EnrollmentData | null>(null);
+    const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [isEnrolling, setIsEnrolling] = useState(false);
+    const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+    const [isFetchingVideo, setIsFetchingVideo] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    // ── Fetch course + lessons ────────────────────────────────────────────────
+
+    const fetchCourse = useCallback(async () => {
+        if (!token || !id) return;
+        setIsLoading(true);
+        setError('');
+        try {
+            const res = await fetch(`${BACKEND}/api/courses/${id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const d = await res.json();
+                throw new Error(d.error || 'Failed to load course');
+            }
+            const data = await res.json();
+            setCourse(data.course);
+            setLessons(data.lessons || []);
+            setEnrollment(data.enrollment);
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : 'Could not load course');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [token, id]);
+
+    useEffect(() => {
+        fetchCourse();
+    }, [fetchCourse]);
+
+    // ── Auto enroll on first visit ────────────────────────────────────────────
+
+    const enroll = useCallback(async () => {
+        if (!token || !id || enrollment) return;
+        setIsEnrolling(true);
+        try {
+            await fetch(`${BACKEND}/api/courses/${id}/enroll`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            await fetchCourse(); // refresh enrollment state
+        } catch {
+            // non-fatal — they can still watch
+        } finally {
+            setIsEnrolling(false);
+        }
+    }, [token, id, enrollment, fetchCourse]);
+
+    useEffect(() => {
+        if (!isLoading && !enrollment && course) enroll();
+    }, [isLoading, enrollment, course, enroll]);
+
+    // ── Fetch signed playback URL whenever the current lesson changes ─────────
+
+    useEffect(() => {
+        const rawUrl = lessons[currentLessonIdx]?.videoUrl;
+        if (!rawUrl || !token) {
+            setPlaybackUrl(null);
+            return;
+        }
+
+        // If it's already a signed GCS url (short-lived token query params), use it directly
+        // Otherwise derive the cloud path from the stored public URL pattern:
+        // https://storage.googleapis.com/BUCKET/uploads/videos/FILE
+        let cloudPath: string | null = null;
+        try {
+            const parsed = new URL(rawUrl);
+            // Signed URLs have X-Goog-Signature param — already valid, use as-is
+            if (parsed.searchParams.has('X-Goog-Signature')) {
+                setPlaybackUrl(rawUrl);
+                return;
+            }
+            // Extract path after the host: /BUCKET/uploads/videos/FILE
+            const pathParts = parsed.pathname.split('/').slice(2); // drop leading '' and BUCKET
+            // Decode %20 etc. → real chars (e.g. spaces) so GCS can find the file by its actual name
+            cloudPath = decodeURIComponent(pathParts.join('/'));
+        } catch {
+            setPlaybackUrl(rawUrl); // fallback: just try directly
+            return;
+        }
+
+        if (!cloudPath) {
+            setPlaybackUrl(rawUrl);
+            return;
+        }
+
+        setIsFetchingVideo(true);
+        setPlaybackUrl(null);
+        fetch(`${BACKEND}/api/ngo/video-url?path=${encodeURIComponent(cloudPath)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.url) setPlaybackUrl(data.url);
+                else setPlaybackUrl(rawUrl); // fallback
+            })
+            .catch(() => setPlaybackUrl(rawUrl))
+            .finally(() => setIsFetchingVideo(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentLessonIdx, lessons, token]);
+
+    // ── Reset video element on lesson change ─────────────────────────────────
+
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.load();
+        }
+    }, [currentLessonIdx]);
+
+    // ── Derived helpers ───────────────────────────────────────────────────────
+
+    const currentLesson = lessons[currentLessonIdx] ?? null;
+    const hasPrev = currentLessonIdx > 0;
+    const hasNext = currentLessonIdx < lessons.length - 1;
+
+    const goToLesson = (idx: number) => {
+        setCurrentLessonIdx(idx);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  RENDER
+    // ─────────────────────────────────────────────────────────────────────────
 
     return (
         <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 md:py-8">
 
-                {/* Breadcrumb — truncate gracefully on mobile */}
-                <nav className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold text-slate-500 mb-4 sm:mb-6 uppercase tracking-wider min-w-0 flex-wrap">
-                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors shrink-0">Dashboard</Link>
-                    <span aria-hidden="true">›</span>
-                    <Link href="/courses" className="hover:text-blue-600 transition-colors shrink-0 hidden sm:inline">Web Accessibility</Link>
-                    <span aria-hidden="true" className="hidden sm:inline">›</span>
-                    <span className="text-slate-900 truncate">ARIA Patterns &amp; Best Practices</span>
+                {/* Breadcrumb */}
+                <nav className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-6 uppercase tracking-wider flex-wrap">
+                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
+                    <span>›</span>
+                    <Link href="/allcourses" className="hover:text-blue-600 transition-colors">All Courses</Link>
+                    <span>›</span>
+                    <span className="text-slate-900">{course?.title ?? 'Loading…'}</span>
                 </nav>
 
-                {/* Header */}
-                <header className="mb-4 sm:mb-6">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 mb-1 sm:mb-2">Advanced CSS Accessibility</h1>
-                    <p className="text-sm sm:text-base text-slate-600 font-medium">Module 4: Accessible Rich Internet Applications (ARIA)</p>
-                </header>
-
-                <div className="flex flex-col xl:flex-row gap-5 sm:gap-6">
-
-                    {/* ── Left Column ─────────────────────────────── */}
-                    <div className="flex-1 min-w-0 flex flex-col gap-5 sm:gap-6">
-
-                        {/* Video Player */}
-                        <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-md relative aspect-video flex flex-col border border-slate-800">
-
-                            {/* Video content area */}
-                            <div className="flex-1 bg-[#4d6a52] flex items-center justify-center relative overflow-hidden text-center p-4 sm:p-8">
-                                <span className="font-serif italic text-white/30 text-4xl sm:text-5xl md:text-7xl lg:text-8xl md:leading-tight -rotate-2 select-none">
-                                    Lesson<br />Content<br />framework!
-                                </span>
-
-                                {/* Play Button */}
-                                <button className="absolute inset-0 m-auto w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 z-10 focus:outline-none focus:ring-4 focus:ring-blue-400 focus:ring-opacity-50">
-                                    <PlayIcon />
-                                </button>
+                {isLoading ? (
+                    <Skeleton />
+                ) : error ? (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-8 text-center">
+                        <p className="text-lg font-bold mb-2">Could not load course</p>
+                        <p className="text-sm">{error}</p>
+                        <Link href="/allcourses" className="mt-4 inline-block text-blue-600 font-bold hover:underline">← Back to All Courses</Link>
+                    </div>
+                ) : course ? (
+                    <>
+                        {/* Header */}
+                        <header className="mb-6">
+                            <div className="flex flex-wrap items-center gap-3 mb-2">
+                                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">{course.level}</span>
+                                <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">{course.category}</span>
+                                {isEnrolling && <span className="text-xs text-slate-400 italic">Enrolling…</span>}
+                                {enrollment && <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">✓ Enrolled · {enrollment.progressPercentage}% complete</span>}
                             </div>
+                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-1">{course.title}</h1>
+                            <p className="text-slate-500 font-medium text-sm">By {course.instructorName}</p>
+                        </header>
 
-                            {/* AI Live Sign Overlay — smaller on mobile, repositioned */}
-                            <div className="absolute bottom-14 right-2 sm:bottom-16 sm:right-4 md:bottom-20 md:right-6 w-24 sm:w-32 md:w-40 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col z-20">
-                                <div className="bg-blue-600 text-white text-[8px] sm:text-[9px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1">
-                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-blue-300 animate-pulse shrink-0" />
-                                    AI Live Sign
-                                </div>
-                                <div className="bg-slate-100 aspect-[4/3] relative flex items-center justify-center">
-                                    <Image
-                                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop"
-                                        alt="AI Agent signing"
-                                        fill
-                                        className="object-cover object-top filter grayscale opacity-90"
-                                    />
-                                </div>
-                                <div className="bg-slate-800 text-white flex justify-between p-1 sm:p-1.5">
-                                    <button className="p-0.5 sm:p-1 hover:text-blue-400 transition-colors" aria-label="Closed Captions for Signer"><CCIcon /></button>
-                                    <button className="p-0.5 sm:p-1 hover:text-blue-400 transition-colors" aria-label="Signer Settings"><SettingsIcon /></button>
-                                    <button className="p-0.5 sm:p-1 hover:text-blue-400 transition-colors" aria-label="Expand Signer"><FullscreenIcon /></button>
-                                </div>
-                            </div>
+                        <div className="flex flex-col xl:flex-row gap-6">
 
-                            {/* Video Controls Bar */}
-                            <div className="bg-gradient-to-t from-slate-900 to-transparent px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 md:gap-4 text-white">
-                                <button className="hover:text-blue-400 transition-colors focus:outline-none shrink-0" aria-label="Play/Pause">
-                                    <PlayIcon />
-                                </button>
-                                <button className="hover:text-blue-400 transition-colors focus:outline-none hidden sm:block shrink-0" aria-label="Volume">
-                                    <VolumeIcon />
-                                </button>
+                            {/* ── Left Column (Video & Content) ─────────────────── */}
+                            <div className="flex-1 min-w-0 flex flex-col gap-6">
 
-                                {/* Timestamp — only on sm+ */}
-                                <span className="text-xs font-semibold font-mono tracking-wide hidden md:inline-block shrink-0 w-24">12:45 / 35:20</span>
-                                {/* Short timestamp on very small */}
-                                <span className="text-xs font-semibold font-mono tracking-wide sm:hidden shrink-0">12:45</span>
-
-                                {/* Progress bar */}
-                                <div className="flex-1 mx-1 sm:mx-2 h-1.5 bg-white/20 rounded-full overflow-visible cursor-pointer relative">
-                                    <div className="absolute left-0 top-0 bottom-0 bg-blue-500 rounded-full" style={{ width: '36%' }} />
-                                    <div className="absolute left-[36%] top-1/2 -translate-y-1/2 -ml-2 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white rounded-full shadow-sm" />
-                                </div>
-
-                                <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
-                                    <button className="hover:text-blue-400 transition-colors hidden sm:block" aria-label="Captions"><CCIcon /></button>
-                                    <button className="hover:text-blue-400 transition-colors hidden md:block" aria-label="Settings"><SettingsIcon /></button>
-                                    <button className="hover:text-blue-400 transition-colors" aria-label="Fullscreen"><FullscreenIcon /></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Mobile transcript toggle — only visible below xl */}
-                        <div className="xl:hidden">
-                            <button
-                                onClick={() => setTranscriptOpen(prev => !prev)}
-                                className="w-full flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                aria-expanded={transcriptOpen}
-                            >
-                                <span className="flex items-center gap-2">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1-19.995.324L2 12A10 10 0 0 1 12 2Z" />
-                                        <path d="M12 2v20M2.5 9h19M2.5 15h19" />
-                                    </svg>
-                                    Real-time Transcript
-                                </span>
-                                <svg
-                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                                    className={`transition-transform ${transcriptOpen ? 'rotate-180' : ''}`}
-                                >
-                                    <polyline points="6 9 12 15 18 9" />
-                                </svg>
-                            </button>
-
-                            {transcriptOpen && (
-                                <div className="mt-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                    <TranscriptContent />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Video Description */}
-                        <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 md:p-6 shadow-sm">
-                            <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
-                                <FileTextIcon />
-                                Video Description
-                            </h2>
-                            <div className="text-sm text-slate-600 leading-relaxed space-y-3 sm:space-y-4 font-medium">
-                                <p>
-                                    This video segment features a split-screen presentation. On the left, a text editor displays semantic HTML code for a navigation menu. The instructor highlights the use of{' '}
-                                    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">&lt;nav&gt;</code> and{' '}
-                                    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">aria-label</code> attributes.
-                                </p>
-                                <p>
-                                    The code shown is:{' '}
-                                    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs break-all">&lt;nav aria-label="Main Navigation"&gt;</code>. On the right side, a visual preview of the website update is shown as the instructor types.
-                                </p>
-                            </div>
-                        </section>
-
-                        {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between gap-3">
-                            <button className="flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 sm:py-3 px-3.5 sm:px-5 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180 shrink-0">
-                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                    <polyline points="12 5 19 12 12 19" />
-                                </svg>
-                                <span className="hidden xs:inline">Previous </span>Lesson
-                            </button>
-                            <button className="flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2">
-                                Next Lesson
-                                <ArrowRightIcon className="w-4 h-4 shrink-0" />
-                            </button>
-                        </div>
-
-                        {/* Course Content List */}
-                        <section>
-                            <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4">Course Content</h2>
-                            <div className="space-y-2 sm:space-y-3">
-                                {courseItems.map((item) => (
-                                    <div
-                                        key={item.num}
-                                        className={`flex items-center justify-between p-3.5 sm:p-4 rounded-xl border-2 transition-colors ${item.status === 'active' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
-                                    >
-                                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                                            {item.status === 'completed' ? (
-                                                <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                </div>
-                                            ) : item.status === 'active' ? (
-                                                <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">{item.num}</div>
-                                            ) : (
-                                                <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">{item.num}</div>
-                                            )}
-                                            <span className={`font-bold text-sm sm:text-base truncate ${item.status === 'active' ? 'text-blue-700' : item.status === 'completed' ? 'text-slate-900' : 'text-slate-500'}`}>
-                                                {item.num}. {item.title}
-                                            </span>
+                                {/* Video Player */}
+                                <div className="bg-black rounded-2xl overflow-hidden shadow-md min-h-[240px]">
+                                    {isFetchingVideo ? (
+                                        <div className="aspect-video flex flex-col items-center justify-center gap-3 bg-slate-900 text-slate-400">
+                                            <div className="w-10 h-10 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin" />
+                                            <p className="text-sm font-semibold">Loading video…</p>
                                         </div>
-                                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 ml-2 ${item.status === 'active' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                            {item.time}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    </div>
+                                    ) : playbackUrl ? (
+                                        <video
+                                            key={playbackUrl}
+                                            ref={videoRef}
+                                            controls
+                                            autoPlay={false}
+                                            className="w-full max-h-[560px] rounded-2xl bg-black"
+                                            controlsList="nodownload"
+                                            aria-label={`Video: ${currentLesson?.title}`}
+                                            onError={() => {
+                                                // If signed URL fails (expired?), trigger a re-fetch
+                                                setPlaybackUrl(null);
+                                                setIsFetchingVideo(false);
+                                            }}
+                                        >
+                                            <source src={playbackUrl} type="video/mp4" />
+                                            <source src={playbackUrl} type="video/webm" />
+                                            <track kind="captions" label="Auto-generated captions" default />
+                                            <p className="text-white p-4 text-sm">
+                                                Your browser does not support the video element.{' '}
+                                                <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
+                                            </p>
+                                        </video>
+                                    ) : currentLesson?.videoUrl ? (
+                                        /* Has a URL stored but signing failed — show direct link */
+                                        <div className="aspect-video flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-300">
+                                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                                                <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                                            </svg>
+                                            <p className="font-semibold text-sm">Could not load video player.</p>
+                                            <a
+                                                href={currentLesson.videoUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-400 underline text-xs"
+                                            >
+                                                Try opening video directly ↗
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <div className="aspect-video flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-400">
+                                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                                                <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                                            </svg>
+                                            <p className="font-semibold">No video available for this lesson yet.</p>
+                                        </div>
+                                    )}
+                                </div>
 
-                    {/* ── Right Column — hidden on mobile (toggle above), shown on xl ── */}
-                    <div className="hidden xl:flex xl:w-[400px] shrink-0 flex-col gap-6">
-                        {/* Real-time Transcript Card */}
-                        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[600px] overflow-hidden">
-                            <header className="bg-blue-600 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1-19.995.324L2 12A10 10 0 0 1 12 2Z" />
-                                            <path d="M12 2v20" />
-                                            <path d="M2.5 9h19" />
-                                            <path d="M2.5 15h19" />
+                                {/* Course Description + Lesson Notes */}
+                                <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                                    <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                        <FileTextIcon />
+                                        {currentLesson ? `Lesson ${currentLesson.order}: ${currentLesson.title}` : 'Course Overview'}
+                                    </h2>
+                                    <div className="text-sm text-slate-600 leading-relaxed space-y-3">
+                                        <p>{course.description}</p>
+                                        {currentLesson?.notesMarkdown && (
+                                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                                <p className="font-bold text-slate-700 mb-2">Lesson Notes:</p>
+                                                <p className="whitespace-pre-line">{currentLesson.notesMarkdown}</p>
+                                            </div>
+                                        )}
+
+                                    </div>
+                                    {/* Accessibility Tags */}
+                                    {course.accessibilityTags?.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
+                                            {course.accessibilityTags.map(tag => (
+                                                <span key={tag} className="bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+                                                    {tag.replace(/-/g, ' ')}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </section>
+
+                                {/* Navigation Buttons */}
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={() => hasPrev && goToLesson(currentLessonIdx - 1)}
+                                        disabled={!hasPrev}
+                                        className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-5 rounded-xl transition-colors text-sm shadow-sm disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180" aria-hidden="true">
+                                            <line x1="5" y1="12" x2="19" y2="12" />
+                                            <polyline points="12 5 19 12 12 19" />
                                         </svg>
-                                    </div>
-                                    <div>
-                                        <h2 className="font-bold text-sm sm:text-base leading-snug">Real-time Transcript</h2>
-                                        <p className="text-[9px] font-bold text-blue-200 tracking-widest uppercase mt-0.5">Auto-Syncing • Multi-Language</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-1 sm:gap-1.5 text-blue-200">
-                                    <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript"><DownloadIcon /></button>
-                                    <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Search transcript"><SearchIcon /></button>
-                                </div>
-                            </header>
-                            <TranscriptContent />
-                        </section>
+                                        Previous Lesson
+                                    </button>
 
-                        {/* Quick Tips */}
-                        <QuickTips />
-                    </div>
+                                    {hasNext ? (
+                                        <button
+                                            onClick={() => goToLesson(currentLessonIdx + 1)}
+                                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                                        >
+                                            Next Lesson
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                                <polyline points="12 5 19 12 12 19" />
+                                            </svg>
+                                        </button>
+                                    ) : (
+                                        <span className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-sm">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                            Course Complete!
+                                        </span>
+                                    )}
+                                </div>
 
-                </div>
+                                {/* All Lessons List */}
+                                <section className="mt-2">
+                                    <h2 className="text-lg font-bold text-slate-900 mb-4">Course Content ({lessons.length} lessons)</h2>
+                                    <div className="space-y-3">
+                                        {lessons.map((lesson, idx) => {
+                                            const isActive = idx === currentLessonIdx;
+                                            const isDone = lesson.completed;
+                                            return (
+                                                <button
+                                                    key={lesson.id}
+                                                    onClick={() => goToLesson(idx)}
+                                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 text-left transition-all ${isActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'}`}
+                                                >
+                                                    <div className="flex items-center gap-4 min-w-0">
+                                                        {isDone ? (
+                                                            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                            </div>
+                                                        ) : isActive ? (
+                                                            <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">{lesson.order}</div>
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">{lesson.order}</div>
+                                                        )}
+                                                        <span className={`font-semibold truncate ${isActive ? 'text-blue-700' : isDone ? 'text-slate-900' : 'text-slate-600'}`}>
+                                                            {lesson.title}
+                                                        </span>
+                                                    </div>
+                                                    <span className={`text-xs font-bold uppercase tracking-wider shrink-0 ml-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                        {isActive ? 'Playing' : lesson.duration ? formatDuration(lesson.duration) : '--:--'}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+
+                                        {lessons.length === 0 && (
+                                            <p className="text-slate-400 text-sm italic p-4 text-center">No lessons have been added to this course yet.</p>
+                                        )}
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* ── Right Column (Transcript / Details) ────────────────── */}
+                            <div className="xl:w-[380px] shrink-0 flex flex-col gap-6">
+
+                                {/* Transcript Card */}
+                                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[540px] overflow-hidden">
+                                    <header className="bg-blue-600 text-white p-5 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h2 className="font-bold text-base leading-snug">Lesson Transcript</h2>
+                                                <p className="text-[9px] font-bold text-blue-200 tracking-widest uppercase mt-0.5">Auto-generated • Accessibility</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1.5 text-blue-200">
+                                            <button className="p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript">
+                                                <DownloadIcon />
+                                            </button>
+                                            <button className="p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Search transcript">
+                                                <SearchInputIcon />
+                                            </button>
+                                        </div>
+                                    </header>
+
+                                    <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
+                                        {currentLesson?.transcript ? (
+                                            <p className="text-slate-600 leading-relaxed">{currentLesson.transcript}</p>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 gap-3">
+                                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                                </svg>
+                                                <p className="font-medium text-sm">No transcript yet.</p>
+                                                <p className="text-xs">A transcript will appear here once the AI processes the audio.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+
+                                {/* Course Info Summary */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+                                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                        <LightningIcon />
+                                        Course Details
+                                    </h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Total Lessons</span>
+                                            <span className="font-bold text-slate-900">{course.totalLessons}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Duration</span>
+                                            <span className="font-bold text-slate-900">{course.totalDuration} min</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Level</span>
+                                            <span className="font-bold text-slate-900">{course.level}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Category</span>
+                                            <span className="font-bold text-slate-900">{course.category}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Instructor</span>
+                                            <span className="font-bold text-slate-900">{course.instructorName}</span>
+                                        </div>
+                                    </div>
+                                    {enrollment && (
+                                        <div className="mt-2 pt-4 border-t border-slate-100">
+                                            <div className="flex justify-between text-xs font-bold mb-1.5">
+                                                <span className="text-slate-600">Your Progress</span>
+                                                <span className="text-blue-700">{enrollment.progressPercentage}%</span>
+                                            </div>
+                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${enrollment.progressPercentage}%` }} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                            </div>
+                        </div>
+                    </>
+                ) : null}
+
             </div>
 
             {/* Footer */}
-            <footer className="mt-8 sm:mt-12 py-6 sm:py-8 border-t border-slate-200 px-4">
-                <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-                    <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
-                        <span>© 2024 Inclusive AI Learning</span>
-                        <span className="hidden sm:inline">•</span>
+            <footer className="mt-12 py-8 border-t border-slate-200 text-center px-4">
+                <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex flex-wrap justify-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        <span>© 2025 EduAble</span>
+                        <span className="hidden md:inline">•</span>
+
                         <Link href="#" className="hover:text-slate-600">Accessibility Statement</Link>
                         <span className="hidden sm:inline">•</span>
                         <Link href="#" className="hover:text-slate-600">Privacy Policy</Link>
                     </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shrink-0">
-                        <CheckCircleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+
                         <span>WCAG 2.2 AAA Compliant</span>
                     </div>
                 </div>
