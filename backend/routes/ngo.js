@@ -1,6 +1,9 @@
 const express = require('express');
 const { Storage } = require('@google-cloud/storage');
 const User = require('../models/User');
+const authMiddleware = require('../middleware/auth');
+const requireRole = require('../middleware/role');
+const { getStats, updateStats } = require('../controllers/ngoController');
 
 const router = express.Router();
 
@@ -16,24 +19,11 @@ const storage = new Storage({
 
 const uploadBucket = process.env.GCS_BUCKET_NAME;
 
-router.get('/stats', async (req, res) => {
-  try {
-    const totalUsers = await User.countDocuments();
-    const onboardedUsers = await User.countDocuments({ onboardingCompleted: true });
+// Public stat read (NGO dashboard widget, landing page counter, etc.)
+router.get('/stats', getStats);
 
-    res.json({
-      totalUsers,
-      onboardedUsers,
-      // The other metrics are mocked since they aren't in the DB yet
-      totalDonations: 45231,
-      activeCampaigns: 5,
-      totalVolunteers: 128
-    });
-  } catch (err) {
-    console.error('[ngo/stats]', err);
-    res.status(500).json({ error: 'Server error fetching stats.' });
-  }
-});
+// Only admin/ngo users can mutate NGO stats
+router.patch('/stats', authMiddleware, requireRole('admin', 'ngo'), updateStats);
 
 // Endpoint to generate Secure Presigned URLs for direct browser-to-cloud uploads
 router.post('/upload-urls', async (req, res) => {
