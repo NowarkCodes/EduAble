@@ -12,7 +12,7 @@ exports.listCourses = asyncHandler(async (req, res) => {
 
     const [inProgressEnrollments, completedEnrollments] = await Promise.all([
         Enrollment.find({ userId, status: 'in_progress' })
-            .populate('courseId', 'title category level thumbnail totalLessons')
+            .populate('courseId', 'title category level thumbnail totalLessons description')
             .lean(),
         Enrollment.find({ userId, status: 'completed' })
             .populate('courseId', 'title category level thumbnail totalLessons')
@@ -20,19 +20,25 @@ exports.listCourses = asyncHandler(async (req, res) => {
             .lean(),
     ]);
 
-    const inProgress = inProgressEnrollments.map((e) => ({
-        id: e.courseId?._id,
-        title: e.courseId?.title,
-        category: e.courseId?.category,
-        level: e.courseId?.level,
-        thumbnail: e.courseId?.thumbnail,
-        progress: e.progressPercentage,
-        lessonsLeft: Math.max(
-            0,
-            (e.courseId?.totalLessons || 0) - Math.round(((e.progressPercentage || 0) / 100) * (e.courseId?.totalLessons || 0))
-        ),
-        lastAccessed: e.updatedAt,
-    }));
+    const inProgress = inProgressEnrollments.map((e) => {
+        const total = e.courseId?.totalLessons || 0;
+        const progress = e.progressPercentage || 0;
+        const lessonsCompleted = Math.round((progress / 100) * total);
+        const lessonsLeft = Math.max(0, total - lessonsCompleted);
+
+        return {
+            id: e.courseId?._id,
+            title: e.courseId?.title,
+            category: e.courseId?.category,
+            level: e.courseId?.level,
+            thumbnail: e.courseId?.thumbnail,
+            progress: progress,
+            totalDuration: e.courseId?.totalDuration || 0,
+            lessonsLeft: lessonsLeft,
+            lastAccessed: e.updatedAt,
+            aiSummary: e.courseId?.description ? e.courseId.description.substring(0, 100) + '...' : 'Quickly mastering the core concepts of this curriculum.',
+        };
+    });
 
     const completed = completedEnrollments.map((e) => ({
         id: e.courseId?._id,
@@ -124,6 +130,10 @@ exports.getCourse = asyncHandler(async (req, res) => {
         return base;
     });
 
+    const totalLessons = lessons.length;
+    const totalDurationSeconds = lessons.reduce((acc, l) => acc + (l.duration || 0), 0);
+    const totalDurationMinutes = Math.round(totalDurationSeconds / 60);
+
     res.json({
         course: {
             id: course._id,
@@ -134,8 +144,8 @@ exports.getCourse = asyncHandler(async (req, res) => {
             instructorName: course.instructorName,
             thumbnail: course.thumbnail,
             accessibilityTags: course.accessibilityTags,
-            totalLessons: course.totalLessons,
-            totalDuration: course.totalDuration,
+            totalLessons: totalLessons || course.totalLessons,
+            totalDuration: totalDurationMinutes || course.totalDuration,
         },
         enrollment: enrollment
             ? {
@@ -143,6 +153,7 @@ exports.getCourse = asyncHandler(async (req, res) => {
                 progressPercentage: enrollment.progressPercentage,
                 enrolledAt: enrollment.enrolledAt,
                 completedAt: enrollment.completedAt,
+                lastAccessedLesson: enrollment.lastAccessedLesson,
             }
             : null,
         lessons: adaptedLessons,
@@ -285,23 +296,64 @@ exports.completeLesson = asyncHandler(async (req, res) => {
         LessonProgress.countDocuments({ userId: req.user._id, courseId, completed: true }),
     ]);
 
-    if (course && course.totalLessons > 0) {
+    if (course) {
+        const actualTotalLessons = course.totalLessons || (await Lesson.countDocuments({ courseId }));
+        
         const progressPercentage = Math.min(
             100,
-            Math.round((completedCount / course.totalLessons) * 100)
+            Math.round((completedCount / (actualTotalLessons || 1)) * 100)
         );
         const isComplete = progressPercentage === 100;
 
-        await Enrollment.findOneAndUpdate(
+        const updatedEnrollment = await Enrollment.findOneAndUpdate(
             { userId: req.user._id, courseId },
             {
                 progressPercentage,
                 status: isComplete ? 'completed' : 'in_progress',
                 lastAccessedLesson: lessonId,
                 ...(isComplete && { completedAt: new Date() }),
-            }
+            },
+            { new: true }
         );
+
+        return res.json({ 
+            message: 'Lesson marked as complete.', 
+            enrollment: updatedEnrollment 
+        });
     }
 
     res.json({ message: 'Lesson marked as complete.' });
+});
+
+/* ── PATCH /api/courses/lessons/:id/duration ────────────────────── */
+exports.updateLessonDuration = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { duration } = req.body;
+
+    if (typeof duration !== 'number' || duration <= 0) {
+        return res.status(400).json({ error: 'Valid duration in seconds is required.' });
+    }
+
+    const lesson = await Lesson.findById(id);
+    if (!lesson) {
+        return res.status(404).json({ error: 'Lesson not found.' });
+    }
+
+    // Only update if duration is currently 0 or significantly different (probed vs placeholder)
+    if (lesson.duration === 0 || Math.abs(lesson.duration - duration) > 2) {
+        lesson.duration = Math.round(duration);
+        await lesson.save();
+
+        // Recalculate Course totalDuration and totalLessons
+        const lessons = await Lesson.find({ courseId: lesson.courseId });
+        const totalDurationSeconds = lessons.reduce((acc, l) => acc + (l.duration || 0), 0);
+        const totalDurationMinutes = Math.round(totalDurationSeconds / 60);
+
+        await Course.findByIdAndUpdate(lesson.courseId, {
+            totalDuration: totalDurationMinutes,
+            totalLessons: lessons.length,
+        });
+    }
+
+    res.json({ message: 'Lesson duration updated.', duration: lesson.duration });
 });

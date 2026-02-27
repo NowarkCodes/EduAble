@@ -11,6 +11,7 @@ interface CourseItem {
     title: string;
     description: string;
     lessonsLeft: number;
+    totalDuration: number;
     estimatedHours: number;
     locked: boolean;
     unlocksAfter?: string;
@@ -54,7 +55,7 @@ function DashboardSkeleton() {
                 <Skeleton className="h-24 w-full rounded-2xl" role="status" aria-label="Loading course cards" />
                 <Skeleton className="h-24 w-full rounded-2xl" role="status" aria-label="Loading more course cards" />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Skeleton className="h-28 rounded-2xl" role="status" aria-label="Loading stats" />
                 <Skeleton className="h-28 rounded-2xl" role="status" aria-label="Loading stats" />
                 <Skeleton className="h-28 rounded-2xl" role="status" aria-label="Loading stats" />
@@ -274,21 +275,21 @@ function CourseCard({ course }: { course: CourseItem }) {
                         aria-label={`${course.lessonsLeft} lessons remaining`}
                     >
                         <LessonsIcon />
-                        <span className="sr-only sm:not-sr-only">{course.lessonsLeft} Lessons Left</span>
+                        <span>{course.lessonsLeft} Lessons Left</span>
                     </span>
                     <span
                         id={`${cardId}-hours`}
                         className="flex items-center gap-1.5"
-                        aria-label={`${course.estimatedHours} hours estimated time`}
+                        aria-label={`${course.totalDuration} minutes total time`}
                     >
                         <ClockIcon />
-                        <span className="sr-only sm:not-sr-only">{course.estimatedHours}h estimated</span>
+                        <span>{course.totalDuration} min total</span>
                     </span>
                 </div>
             </div>
             <Link
-                href="/courses"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-slate-900 text-slate-900 text-sm font-bold hover:bg-slate-900 hover:text-white transition-all focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 shrink-0"
+                href={`/courses/${course.id}`}
+                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 sm:px-5 sm:py-2.5 rounded-xl border-2 border-slate-900 text-slate-900 text-sm font-bold hover:bg-slate-900 hover:text-white transition-all focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 shrink-0"
                 aria-describedby={cardId}
             >
                 <span className="sr-only sm:not-sr-only">Continue</span>
@@ -458,7 +459,7 @@ export default function DashboardPage() {
                 <main
                     id="main-content"
                     ref={mainRef}
-                    className="max-w-3xl mx-auto px-4 sm:px-8 py-8"
+                    className="max-w-5xl mx-auto px-4 sm:px-8 py-8"
                     role="main"
                     aria-label={`Dashboard for ${displayName}`}
                 >
@@ -480,11 +481,11 @@ export default function DashboardPage() {
                     ) : (
                         <>
                             {/* Heading */}
-                            <header className="mb-6">
-                                <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-none mb-2">
+                            <header className="mb-6 sm:mb-8">
+                                <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-2">
                                     Dashboard
                                 </h1>
-                                <p className="text-slate-500 text-base">
+                                <p className="text-slate-500 text-sm sm:text-base max-w-2xl">
                                     Welcome back, {displayName.split(' ')[0]}. Continue your path to mastering inclusive design.
                                 </p>
                             </header>
@@ -493,7 +494,7 @@ export default function DashboardPage() {
                             {data?.resumeCourse && (
                                 <section
                                     aria-labelledby="resume-title"
-                                    className="mb-10 rounded-2xl bg-slate-900 text-white p-6 flex flex-col sm:flex-row gap-5 items-start sm:items-center"
+                                    className="mb-8 sm:mb-10 rounded-2xl bg-slate-900 text-white p-5 sm:p-7 flex flex-col md:flex-row gap-5 items-start md:items-center"
                                 >
                                     <div
                                         id="resume-title"
@@ -501,24 +502,24 @@ export default function DashboardPage() {
                                     >
                                         Resume your learning
                                     </div>
-                                    <div className="w-24 h-20 sm:w-28 sm:h-24 rounded-xl bg-slate-700 shrink-0 flex items-center justify-center border border-slate-600" aria-hidden="true">
-                                        <div className="w-10 h-10 rounded-lg bg-slate-500" />
+                                    <div className="w-full md:w-32 h-32 md:h-24 rounded-xl bg-slate-700 shrink-0 flex items-center justify-center border border-slate-600" aria-hidden="true">
+                                        <div className="w-12 h-12 rounded-lg bg-slate-500" />
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-1">
+                                    <div className="flex-1 min-w-0 w-full">
+                                        <p className="text-[10px] sm:text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-1.5">
                                             Resume Learning
                                         </p>
-                                        <h2 className="text-base sm:text-lg font-extrabold leading-snug mb-3">
+                                        <h2 className="text-lg sm:text-xl font-extrabold leading-snug mb-3">
                                             {data.resumeCourse.title}
                                         </h2>
-                                        <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
-                                            <span className="text-slate-300">{data.resumeCourse.module}</span>
-                                            <span className="text-white" aria-label={`${data.resumeCourse.progress}% complete`}>
-                                                {data.resumeCourse.progress}% Complete
+                                        <div className="flex items-center justify-between text-xs font-semibold mb-2">
+                                            <span className="text-slate-300 truncate max-w-[70%]">{data.resumeCourse.module}</span>
+                                            <span className="text-white shrink-0" aria-label={`${data.resumeCourse.progress}% complete`}>
+                                                {data.resumeCourse.progress}%
                                             </span>
                                         </div>
                                         <div
-                                            className="w-full h-2 rounded-full bg-slate-700 overflow-hidden mb-4"
+                                            className="w-full h-2 rounded-full bg-slate-700 overflow-hidden mb-5"
                                             role="progressbar"
                                             aria-valuenow={data.resumeCourse.progress}
                                             aria-valuemin={0}
@@ -526,13 +527,13 @@ export default function DashboardPage() {
                                             aria-label={`${data.resumeCourse.title} progress: ${data.resumeCourse.progress}% complete`}
                                         >
                                             <div
-                                                className="h-full rounded-full bg-blue-500 transition-all"
+                                                className="h-full rounded-full bg-blue-500 transition-all duration-500"
                                                 style={{ width: `${data.resumeCourse.progress}%` }}
                                             />
                                         </div>
                                         <Link
                                             href={`/courses/${data.resumeCourse.id}`}
-                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-slate-900 text-sm font-bold hover:bg-slate-100 transition-colors focus:outline-none focus:ring-4 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-900"
+                                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-slate-900 text-sm font-bold hover:bg-slate-100 transition-colors focus:outline-none focus:ring-4 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-900"
                                             aria-label={`Continue Module ${data.resumeCourse.currentModuleNumber} of ${data.resumeCourse.title}`}
                                         >
                                             <PlayIcon />
@@ -584,7 +585,7 @@ export default function DashboardPage() {
 
                             {/* Stats */}
                             <section aria-label="Learning statistics" className="mb-10">
-                                <div className="grid grid-cols-3 gap-3 sm:gap-4" role="group">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4" role="group">
                                     {stats.map(s => <StatCard key={s.label} {...s} />)}
                                 </div>
                             </section>

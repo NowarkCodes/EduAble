@@ -45,6 +45,7 @@ router.post('/upload-urls', async (req, res) => {
       version: 'v4',
       action: 'write',
       expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
+      extensionHeaders: req.body.duration ? { 'x-goog-meta-duration': String(req.body.duration) } : undefined,
     };
 
     // Generate secure upload URLs directly from Google
@@ -96,6 +97,7 @@ router.get('/videos', async (req, res) => {
           url: signedUrl, // signed, playable URL
           size: file.metadata.size,
           updated: file.metadata.updated,
+          duration: file.metadata.metadata?.duration ? parseInt(file.metadata.metadata.duration) : 0,
         };
       });
 
@@ -147,7 +149,7 @@ router.post('/courses', authMiddleware, requireRole('admin', 'ngo'), async (req,
     let totalDuration = 0;
     videos.forEach(v => {
       // Just a placeholder duration if it's not provided by frontend (videos from GCS might not have direct duration meta easily available unless probed by ffmpeg beforehand)
-      totalDuration += (v.duration || 5 * 60); // default 5 mins if unknown
+      totalDuration += (v.duration || 0);
     });
 
     const newCourse = await Course.create({
@@ -182,7 +184,7 @@ router.post('/courses', authMiddleware, requireRole('admin', 'ngo'), async (req,
         ? `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${v.cloudPath}`
         : toPermanentUrl(v.url),
       order: index + 1,
-      duration: v.duration || 300,
+      duration: v.duration || 0,
       transcript: '',
       simplifiedText: '',
     }));

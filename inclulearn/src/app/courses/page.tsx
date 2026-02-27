@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 
@@ -59,12 +60,23 @@ function InProgressCard({ course }: { course: InProgressCourse }) {
         <article className="rounded-2xl border border-slate-200 bg-white overflow-hidden hover:shadow-md hover:border-blue-200 transition-all">
             <div className="flex flex-col sm:flex-row">
                 {/* Thumbnail */}
-                <div className="w-full sm:w-36 h-36 sm:h-auto bg-gradient-to-br from-slate-700 to-slate-900 shrink-0 flex items-center justify-center">
-                    <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center">
-                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="white" strokeWidth="1.5" aria-hidden="true">
-                            <rect x="2" y="3" width="24" height="19" rx="2" /><path d="M8 9h12M8 14h8" strokeLinecap="round" />
-                        </svg>
-                    </div>
+                <div className="w-full sm:w-36 h-36 sm:h-auto bg-slate-100 shrink-0 relative flex items-center justify-center border-r border-slate-100 overflow-hidden">
+                    {course.thumbnail ? (
+                        <img
+                            src={course.thumbnail}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover"
+                            aria-hidden="true"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="white" strokeWidth="1.5" aria-hidden="true">
+                                    <rect x="2" y="3" width="24" height="19" rx="2" /><path d="M8 9h12M8 14h8" strokeLinecap="round" />
+                                </svg>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 p-5">
@@ -102,9 +114,12 @@ function InProgressCard({ course }: { course: InProgressCourse }) {
                     </div>
                     <div className="flex items-center justify-between mt-3">
                         <p className="text-[11px] text-slate-400 font-medium">Last accessed {course.lastAccessed}</p>
-                        <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2">
+                        <Link
+                            href={`/courses/${course.id}`}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                        >
                             Continue Learning →
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -116,28 +131,53 @@ function InProgressCard({ course }: { course: InProgressCourse }) {
 function CompletedCard({ course }: { course: CompletedCourse }) {
     const badgeClass = categoryColors[course.category] ?? 'bg-slate-100 text-slate-600';
     return (
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row gap-4 sm:items-center hover:shadow-sm transition-all">
-            <div className="w-14 h-14 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center shrink-0">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10" fill="#22c55e" />
-                    <path d="M7 12l3 3 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${badgeClass}`}>{course.category}</span>
-                    <span className="text-[10px] text-slate-400 font-medium">• {course.level}</span>
+        <article className="rounded-2xl border border-slate-200 bg-white overflow-hidden hover:shadow-sm transition-all focus-within:ring-2 focus-within:ring-green-500">
+            <div className="flex flex-col sm:flex-row">
+                {/* Thumbnail */}
+                <div className="w-full sm:w-36 h-36 sm:h-auto bg-slate-100 shrink-0 relative flex items-center justify-center border-r border-slate-100 overflow-hidden">
+                    {course.thumbnail ? (
+                        <img
+                            src={course.thumbnail}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover"
+                            aria-hidden="true"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-emerald-500 flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <h3 className="text-base font-bold text-slate-900">{course.title}</h3>
-                <p className="text-xs text-slate-400 mt-1">Completed {new Date(course.completedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+
+                <div className="flex-1 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${badgeClass}`}>{course.category}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">• {course.level}</span>
+                        </div>
+                        <Link href={`/courses/${course.id}`} className="hover:text-blue-600 transition-colors">
+                            <h3 className="text-base font-bold text-slate-900 truncate">{course.title}</h3>
+                        </Link>
+                        <p className="text-xs text-slate-400 mt-1">
+                            Completed {new Date(course.completedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                    </div>
+
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <a
+                            href={course.certificateUrl}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border-2 border-green-600 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 shrink-0"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1" y="2" width="11" height="9" rx="1" /><path d="M4 6.5h5M6.5 4v5" strokeLinecap="round" /></svg>
+                            Certificate
+                        </a>
+                    </div>
+                </div>
             </div>
-            <a
-                href={course.certificateUrl}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-green-600 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 shrink-0"
-            >
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1" y="2" width="11" height="9" rx="1" /><path d="M4 6.5h5M6.5 4v5" strokeLinecap="round" /></svg>
-                Certificate
-            </a>
         </article>
     );
 }
@@ -185,7 +225,7 @@ export default function CoursesPage() {
 
     return (
         <DashboardLayout userInitials={initials} userName={authUser?.name ?? 'User'} userTier="Standard Account">
-            <div className="max-w-3xl mx-auto px-4 sm:px-8 py-8">
+            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
                 {/* Header */}
                 <div className="mb-6">
                     <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-1">My Courses</h1>
