@@ -56,6 +56,17 @@ export const profileApi = {
     request(`/api/profile/${userId}`),
 };
 
+/* ── Dashboard ────────────────────────────────────── */
+export const dashboardApi = {
+  get: () => request('/api/dashboard'),
+};
+
+/* ── Courses ──────────────────────────────────────── */
+export const coursesApi = {
+  list: () => request<{ inProgress: unknown[]; completed: unknown[] }>('/api/courses'),
+  progress: () => request('/api/courses/progress'),
+};
+
 /* ── Types ────────────────────────────────────────── */
 export type AuthUser = {
   id: string;

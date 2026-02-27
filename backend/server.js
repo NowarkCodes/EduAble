@@ -15,9 +15,11 @@ app.use(cors({
 app.use(express.json());
 
 /* ── Routes ─────────────────────────────────────── */
-app.use('/api/auth',    require('./routes/auth'));
-app.use('/api/profile', require('./routes/profile'));
-app.use('/api/ngo',     require('./routes/ngo'));
+app.use('/api/auth',      require('./routes/auth'));
+app.use('/api/profile',   require('./routes/profile'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/courses',   require('./routes/courses'));
+app.use('/api/ngo',       require('./routes/ngo'));
 
 /* ── Health check ───────────────────────────────── */
 app.get('/api/health', (_req, res) => {
