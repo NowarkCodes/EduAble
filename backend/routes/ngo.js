@@ -1,6 +1,8 @@
 const express = require('express');
 const { Storage } = require('@google-cloud/storage');
 const User = require('../models/User');
+const Course = require('../models/Course');
+const Lesson = require('../models/Lesson');
 const authMiddleware = require('../middleware/auth');
 const requireRole = require('../middleware/role');
 const {
@@ -84,26 +86,130 @@ router.post('/upload-urls', async (req, res) => {
   }
 });
 
-// Endpoint to list uploaded videos from Google Cloud Storage
+// Shared helper: generate a signed read URL for a GCS file path
+async function getSignedReadUrl(filePath) {
+  const [url] = await storage.bucket(uploadBucket).file(filePath).getSignedUrl({
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + 60 * 60 * 1000, // 1 hour
+  });
+  return url;
+}
+
+// Endpoint to list uploaded videos with signed read URLs (for NGO library + course creation)
 router.get('/videos', async (req, res) => {
   try {
     const [files] = await storage.bucket(uploadBucket).getFiles({ prefix: 'uploads/videos/' });
 
-    const videos = files.map(file => {
-      // Create a direct URL to the public file or use Signed URLs if the bucket is fully private
-      // For this hackathon, we'll assume they can be accessed directly or the user will manage access
-      return {
-        name: file.name.replace('uploads/videos/', ''),
-        url: `https://storage.googleapis.com/${uploadBucket}/${encodeURI(file.name)}`,
-        size: file.metadata.size,
-        updated: file.metadata.updated,
-      };
-    }).filter(v => v.name !== ''); // Filter out the prefix folder itself if it exists
 
+    const videoPromises = files
+      .filter(file => file.name !== 'uploads/videos/') // skip folder entry
+      .map(async file => {
+        const signedUrl = await getSignedReadUrl(file.name);
+        return {
+          name: file.name.replace('uploads/videos/', ''),
+          cloudPath: file.name,
+          url: signedUrl, // signed, playable URL
+          size: file.metadata.size,
+          updated: file.metadata.updated,
+        };
+      });
+
+    const videos = await Promise.all(videoPromises);
     res.json({ videos });
   } catch (err) {
     console.error('[ngo/videos] GCS Error:', err);
     res.status(500).json({ error: 'Failed to fetch videos from Google Cloud Storage.' });
+  }
+});
+
+// Endpoint to get a fresh signed read URL for a single video (used by the course player)
+// GET /api/ngo/video-url?path=uploads/videos/xxx-filename.mp4
+router.get('/video-url', authMiddleware, async (req, res) => {
+  try {
+    const rawPath = req.query.path;
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Missing path query parameter.' });
+    }
+    // Decode any %20 etc. so GCS receives the real file name (with spaces, etc.)
+    const filePath = decodeURIComponent(rawPath);
+
+    // Validate path starts with uploads/ to prevent arbitrary access
+    if (!filePath.startsWith('uploads/')) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    console.log(`[ngo/video-url] Generating signed URL for: ${filePath}`);
+    const signedUrl = await getSignedReadUrl(filePath);
+    res.json({ url: signedUrl });
+  } catch (err) {
+    console.error('[ngo/video-url] GCS Error:', err.message);
+    res.status(500).json({ error: 'Failed to generate playback URL.', detail: err.message });
+  }
+});
+
+
+
+// Endpoint to create a new Course from the NGO Dashboard
+router.post('/courses', authMiddleware, requireRole('admin', 'ngo'), async (req, res) => {
+  try {
+    const { title, description, category, instructorName, thumbnail, accessibilityTags, level, videos } = req.body;
+
+    if (!title || !description || !category || !videos || videos.length === 0) {
+      return res.status(400).json({ error: 'Title, description, category, and at least one video are required.' });
+    }
+
+    // Attempt to guess total duration directly or default to 0
+    let totalDuration = 0;
+    videos.forEach(v => {
+      // Just a placeholder duration if it's not provided by frontend (videos from GCS might not have direct duration meta easily available unless probed by ffmpeg beforehand)
+      totalDuration += (v.duration || 5 * 60); // default 5 mins if unknown
+    });
+
+    const newCourse = await Course.create({
+      title,
+      description,
+      category,
+      instructorName: instructorName || req.user.name || 'EduAble Instructor',
+      thumbnail: thumbnail || null,
+      accessibilityTags: accessibilityTags || ['caption-supported', 'screen-reader-friendly'],
+      level: level || 'Beginner',
+      totalLessons: videos.length,
+      totalDuration: Math.round(totalDuration / 60), // in minutes
+      isPublished: true,
+    });
+    // Create a lesson for each video selected.
+    // IMPORTANT: v.url may be a signed URL (expires in 1hr). Strip the
+    // signature query params so we store only the permanent GCS base URL.
+    // The course player calls /api/ngo/video-url to get a fresh signed READ URL.
+    const toPermanentUrl = (url) => {
+      try {
+        const parsed = new URL(url);
+        return `${parsed.origin}${parsed.pathname}`;
+      } catch {
+        return url;
+      }
+    };
+
+    const lessonDocs = videos.map((v, index) => ({
+      courseId: newCourse._id,
+      title: v.name || `Lesson ${index + 1}`,
+      videoUrl: v.cloudPath
+        ? `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${v.cloudPath}`
+        : toPermanentUrl(v.url),
+      order: index + 1,
+      duration: v.duration || 300,
+      transcript: '',
+      simplifiedText: '',
+    }));
+
+    await Lesson.insertMany(lessonDocs);
+
+
+    res.status(201).json({ message: 'Course created successfully', course: newCourse });
+  } catch (err) {
+    console.error('[ngo/courses] Creation Error:', err);
+    res.status(500).json({ error: 'Failed to create course. ' + err.message });
   }
 });
 

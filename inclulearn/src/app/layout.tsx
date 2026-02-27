@@ -1,13 +1,17 @@
 import type { Metadata } from 'next';
+import { Inter } from "next/font/google";
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
+import { AccessibilityProvider } from '@/context/AccessibilityContext';
 
 export const metadata: Metadata = {
-  title: 'EduLearn — Accessible Education for Every Student',
+  title: 'EduAble — Accessible Education for Every Student',
   description:
-    'EduLearn is an accessible e-learning platform built to WCAG 2.1 AA standards. Screen reader ready, keyboard friendly, and designed for every learner.',
+    'EduAble is an accessible e-learning platform built to WCAG 2.1 AA standards. Screen reader ready, keyboard friendly, and designed for every learner.',
   keywords: ['accessible education', 'e-learning', 'WCAG', 'screen reader', 'inclusive learning'],
 };
+
+const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({
   children,
@@ -23,10 +27,13 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
-      <body>
-        <AuthProvider>{children}</AuthProvider>
+      <body className={inter.className}>
+        <AccessibilityProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </AccessibilityProvider>
       </body>
     </html>
   );
 }
-

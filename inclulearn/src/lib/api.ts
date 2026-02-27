@@ -7,7 +7,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('edulearn_token');
+  return localStorage.getItem('EduAble_token');
 }
 
 type RequestOptions = {
@@ -45,6 +45,12 @@ export const authApi = {
 
   login: (payload: { email: string; password: string }) =>
     request<{ token: string; user: AuthUser }>('/api/auth/login', { method: 'POST', body: payload }),
+
+  ngoRegister: (payload: { name: string; email: string; password: string; confirmPassword: string }) =>
+    request<{ token: string; user: AuthUser }>('/api/auth/ngo-register', { method: 'POST', body: payload }),
+
+  ngoLogin: (payload: { email: string; password: string }) =>
+    request<{ token: string; user: AuthUser }>('/api/auth/ngo-login', { method: 'POST', body: payload }),
 };
 
 /* ── Profile ──────────────────────────────────────── */
@@ -73,6 +79,7 @@ export type AuthUser = {
   name: string;
   email: string;
   onboardingCompleted: boolean;
+  role: string;
 };
 
 export type OnboardingData = {

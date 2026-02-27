@@ -12,7 +12,6 @@ const UserSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, 'Email is required'],
-      unique: true,
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
@@ -23,6 +22,11 @@ const UserSchema = new mongoose.Schema(
       minlength: [8, 'Password must be at least 8 characters'],
       select: false, // Never return password in queries by default
     },
+    role: {
+      type: String,
+      enum: ['student', 'ngo', 'admin'],
+      default: 'student',
+    },
     onboardingCompleted: {
       type: Boolean,
       default: false,
@@ -30,6 +34,10 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+/* ── Compound Index ───────────────────────────────── */
+// This allows the same email to be used for both a 'student' and 'ngo' account separately.
+UserSchema.index({ email: 1, role: 1 }, { unique: true });
 
 /* ── Hash password before saving ──────────────────── */
 UserSchema.pre('save', async function (next) {

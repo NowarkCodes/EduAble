@@ -3,34 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useAccessibility } from '@/context/AccessibilityContext';
 
 export default function Header() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [highContrast, setHighContrast] = useState(false);
-  const [textSize, setTextSize] =
-    useState<'A' | 'A+' | 'A++'>('A');
+  const { highContrast, setHighContrast, textScale, setTextScale } = useAccessibility();
 
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  /* ---------- Theme ---------- */
-  useEffect(() => {
-    const root = document.documentElement;
-
-    highContrast
-      ? root.setAttribute('data-theme', 'high-contrast')
-      : root.removeAttribute('data-theme');
-
-  }, [highContrast]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute(
-      'data-text-size',
-      textSize
-    );
-  }, [textSize]);
 
   /* ---------- Outside Click ---------- */
   useEffect(() => {
@@ -74,7 +56,11 @@ export default function Header() {
     'Pricing',
   ];
 
-  const textSizes = ['A', 'A+', 'A++'] as const;
+  const textSizes = [
+    { label: 'A', value: 100 },
+    { label: 'A+', value: 125 },
+    { label: 'A++', value: 150 }
+  ] as const;
 
   return (
     <>
@@ -93,7 +79,7 @@ export default function Header() {
             </div>
 
             <span className="text-lg sm:text-xl">
-              EduLearn
+              EduAble
             </span>
           </Link>
 
@@ -155,7 +141,7 @@ export default function Header() {
                       role="switch"
                       aria-checked={highContrast}
                       onClick={() =>
-                        setHighContrast(v => !v)
+                        setHighContrast(!highContrast)
                       }
                       className={`w-11 h-6 rounded-full relative transition
                       ${highContrast
@@ -185,17 +171,17 @@ export default function Header() {
 
                       {textSizes.map(size => (
                         <button
-                          key={size}
+                          key={size.label}
                           onClick={() =>
-                            setTextSize(size)
+                            setTextScale(size.value)
                           }
                           className={`flex-1 py-1.5 rounded-md text-sm font-semibold border transition
-                          ${textSize === size
+                          ${textScale === size.value
                               ? 'bg-primary text-white border-primary'
                               : 'border-border hover:border-primary'
                             }`}
                         >
-                          {size}
+                          {size.label}
                         </button>
                       ))}
 
@@ -251,7 +237,7 @@ export default function Header() {
           <aside className="fixed right-0 top-0 h-full w-72 bg-card border-l border-border z-50 shadow-xl p-6 flex flex-col animate-slide-in-right">
 
             <h2 className="font-bold text-primary text-lg mb-6">
-              EduLearn
+              EduAble
             </h2>
 
             <nav className="flex flex-col gap-2">
