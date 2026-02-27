@@ -3,8 +3,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function NgoDashboard() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'video-upload' | 'video-list' | 'settings'>('dashboard');
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -24,6 +29,13 @@ export default function NgoDashboard() {
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<any>(null);
+
+  // Auth Guard
+  useEffect(() => {
+    if (!loading && (!user || (user.role !== 'ngo' && user.role !== 'admin'))) {
+      router.push('/ngo');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     ffmpegRef.current = new FFmpeg();
@@ -188,6 +200,15 @@ export default function NgoDashboard() {
         .finally(() => setIsLoadingVideos(false));
     }
   }, [activeTab]);
+
+  // Prevent flash of content while checking auth
+  if (loading || !user || (user.role !== 'ngo' && user.role !== 'admin')) {
+    return (
+      <div className="min-h-screen bg-[#f4f7fe] flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-[#1a56db]/20 border-t-[#1a56db] rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#f4f7fe] text-[#2b3674] font-sans">

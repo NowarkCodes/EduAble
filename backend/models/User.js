@@ -23,6 +23,11 @@ const UserSchema = new mongoose.Schema(
       minlength: [8, 'Password must be at least 8 characters'],
       select: false, // Never return password in queries by default
     },
+    role: {
+      type: String,
+      enum: ['student', 'ngo', 'admin'],
+      default: 'student',
+    },
     onboardingCompleted: {
       type: Boolean,
       default: false,
