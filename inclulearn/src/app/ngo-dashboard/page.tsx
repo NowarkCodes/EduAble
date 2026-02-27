@@ -5,6 +5,8 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import DashboardLayout, { NavItemType } from '@/components/DashboardLayout';
+import { LayoutDashboard, Video, Library, Settings } from 'lucide-react';
 
 export default function NgoDashboard() {
   const { user, loading } = useAuth();
@@ -210,87 +212,33 @@ export default function NgoDashboard() {
     );
   }
 
+  const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'N';
+  const displayName = user?.name || 'NGO Partner';
+
+  const ngoNavItems: NavItemType[] = [
+    { label: 'Dashboard', icon: LayoutDashboard, href: '#', isActive: activeTab === 'dashboard', onClick: () => setActiveTab('dashboard') },
+    { label: 'Video Upload', icon: Video, href: '#', isActive: activeTab === 'video-upload', onClick: () => setActiveTab('video-upload') },
+    { label: 'Video Library', icon: Library, href: '#', isActive: activeTab === 'video-list', onClick: () => setActiveTab('video-list') },
+    { label: 'Settings', icon: Settings, href: '#', isActive: activeTab === 'settings', onClick: () => setActiveTab('settings') },
+  ];
+
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-[#f4f7fe] text-[#2b3674] font-sans">
-      {/* Sidebar */}
-      <aside className="w-full lg:w-[250px] bg-white p-4 lg:py-8 lg:px-6 flex flex-col border-b lg:border-b-0 lg:border-r border-[#e0e5f2] shadow-[4px_0_24px_rgba(112,144,176,0.08)] shrink-0">
-        <div className="text-2xl font-extrabold text-[#1a56db] mb-4 lg:mb-10 text-center tracking-tight">
-          EduAble NGO
-        </div>
-        <nav className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible no-scrollbar pb-2 lg:pb-0">
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'dashboard'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}
-            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">📊</span> Dashboard
-          </a>
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'video-upload'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('video-upload'); }}
-            aria-current={activeTab === 'video-upload' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">📹</span> Video Upload
-          </a>
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'video-list'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('video-list'); }}
-            aria-current={activeTab === 'video-list' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">📂</span> Video Library
-          </a>
-          <a
-            href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'settings'
-                ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
-                : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
-            onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}
-            aria-current={activeTab === 'settings' ? 'page' : undefined}
-          >
-            <span aria-hidden="true">⚙️</span> Settings
-          </a>
-        </nav>
-      </aside>
+    <DashboardLayout
+        userInitials={initials}
+        userName={displayName}
+        userTier="NGO Partner Account"
+        navItems={ngoNavItems}
+    >
 
       {/* Main Content */}
       <main className="flex-1 p-6 lg:p-12 flex flex-col gap-8 overflow-y-auto">
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 lg:gap-0">
-          <h1 className="text-3xl font-bold text-[#2b3674] m-0">Welcome back, Partner!</h1>
-          <div className="flex items-center gap-6 w-full justify-end lg:w-auto">
-            <div
-              className="text-xl cursor-pointer bg-white p-2.5 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.05)] transition-transform duration-200 hover:scale-110 flex items-center justify-center h-12 w-12 leading-none"
-              aria-label="Notifications"
-              role="button"
-              tabIndex={0}
-            >
-              🔔
-            </div>
-            <div
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1a56db] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xl shadow-[0_4px_12px_rgba(26,86,219,0.3)] cursor-pointer transition-transform duration-200 hover:scale-105 shrink-0"
-              aria-label="User Profile"
-              role="button"
-              tabIndex={0}
-            >
-              N
-            </div>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-none mb-2">
+            Welcome back, Partner!
+          </h1>
+          <p className="text-slate-500 text-base">
+            Manage your inclusive educational content and view learner statistics.
+          </p>
         </header>
 
         {activeTab === 'dashboard' && (
@@ -656,6 +604,6 @@ export default function NgoDashboard() {
           </section>
         )}
       </main>
-    </div>
+    </DashboardLayout>
   );
 }

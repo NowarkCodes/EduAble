@@ -6,6 +6,15 @@ import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UserIcon } from 'lucide-react';
 
+/* ── Types ───────────────────────────────────────── */
+export interface NavItemType {
+    label: string;
+    icon: any;
+    href: string;
+    onClick?: () => void;
+    isActive?: boolean;
+}
+
 /* ── SVG Icons ───────────────────────────────────── */
 function GridIcon({ size = 18 }: { size?: number }) {
     return (
@@ -68,7 +77,7 @@ function CloseIcon() {
     );
 }
 
-const navItems = [
+const defaultNavItems: NavItemType[] = [
     { label: 'Dashboard', icon: GridIcon, href: '/dashboard' },
     { label: 'My Courses', icon: BookIcon, href: '/courses' },
     { label: 'All Courses', icon: BookIcon, href: '/allcourses' },
@@ -78,7 +87,7 @@ const navItems = [
 ];
 
 /* ── Sidebar ─────────────────────────────────────── */
-function Sidebar({ userInitials, userName, userTier }: { userInitials: string; userName: string; userTier: string }) {
+function Sidebar({ userInitials, userName, userTier, items }: { userInitials: string; userName: string; userTier: string; items: NavItemType[] }) {
     const pathname = usePathname();
     const { logout } = useAuth();
     const router = useRouter();
@@ -100,17 +109,28 @@ function Sidebar({ userInitials, userName, userTier }: { userInitials: string; u
 
             {/* Nav */}
             <nav aria-label="Main navigation" className="flex flex-col gap-1 flex-1">
-                {navItems.map(({ label, icon: Icon, href }) => {
-                    const active = pathname === href || pathname.startsWith(href + '/');
+                {items.map(({ label, icon: Icon, href, onClick, isActive }) => {
+                    // Use active prop if provided (for SPA tabs), otherwise fallback to pathname matching
+                    const active = isActive !== undefined ? isActive : ((pathname === href) || (pathname.startsWith(href + '/') && href !== '/'));
+                    
+                    const commonClasses = `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors w-full text-left
+                                ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`;
+                    
+                    if (onClick) {
+                        return (
+                            <button key={label} onClick={onClick} className={commonClasses} aria-current={active ? 'page' : undefined}>
+                                <Icon size={16} />
+                                {label}
+                            </button>
+                        );
+                    }
+
                     return (
                         <Link
                             key={label}
                             href={href}
                             aria-current={active ? 'page' : undefined}
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors
-                ${active
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                            className={commonClasses}
                         >
                             <Icon size={16} />
                             {label}
@@ -170,7 +190,7 @@ function MobileTopBar({ userInitials, onMenuToggle, menuOpen }: { userInitials: 
 }
 
 /* ── Mobile drawer ───────────────────────────────── */
-function MobileDrawer({ open, onClose, userInitials, userName, userTier }: { open: boolean; onClose: () => void; userInitials: string; userName: string; userTier: string }) {
+function MobileDrawer({ open, onClose, userInitials, userName, userTier, items }: { open: boolean; onClose: () => void; userInitials: string; userName: string; userTier: string; items: NavItemType[] }) {
     const pathname = usePathname();
     const { logout } = useAuth();
     const router = useRouter();
@@ -197,16 +217,28 @@ function MobileDrawer({ open, onClose, userInitials, userName, userTier }: { ope
                     </div>
                 </div>
                 <nav className="flex flex-col gap-1 flex-1">
-                    {navItems.map(({ label, icon: Icon, href }) => {
-                        const active = pathname === href || pathname.startsWith(href + '/');
+                    {items.map(({ label, icon: Icon, href, onClick, isActive }) => {
+                        const active = isActive !== undefined ? isActive : ((pathname === href) || (pathname.startsWith(href + '/') && href !== '/'));
+                        
+                        const commonClasses = `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors w-full text-left
+                  ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`;
+
+                        if (onClick) {
+                            return (
+                                <button key={label} onClick={() => { onClick(); onClose(); }} className={commonClasses} aria-current={active ? 'page' : undefined}>
+                                    <Icon size={16} />
+                                    {label}
+                                </button>
+                            );
+                        }
+
                         return (
                             <Link
                                 key={label}
                                 href={href}
                                 onClick={onClose}
                                 aria-current={active ? 'page' : undefined}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors
-                  ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                                className={commonClasses}
                             >
                                 <Icon size={16} />
                                 {label}
@@ -227,19 +259,31 @@ function MobileDrawer({ open, onClose, userInitials, userName, userTier }: { ope
 }
 
 /* ── Bottom Mobile Nav ───────────────────────────── */
-function BottomNav() {
+function BottomNav({ items }: { items: NavItemType[] }) {
     const pathname = usePathname();
     return (
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 flex" aria-label="Mobile navigation">
-            {navItems.map(({ label, icon: Icon, href }) => {
-                const active = pathname === href || pathname.startsWith(href + '/');
+            {items.map(({ label, icon: Icon, href, onClick, isActive }) => {
+                const active = isActive !== undefined ? isActive : ((pathname === href) || (pathname.startsWith(href + '/') && href !== '/'));
+                
+                const commonClasses = `flex-1 flex flex-col items-center justify-center py-2.5 text-[10px] font-bold gap-1 transition-colors
+              ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-700'}`;
+
+                if (onClick) {
+                    return (
+                        <button key={label} onClick={onClick} className={commonClasses} aria-current={active ? 'page' : undefined}>
+                            <Icon size={20} />
+                            {label}
+                        </button>
+                    );
+                }
+
                 return (
                     <Link
                         key={label}
                         href={href}
                         aria-current={active ? 'page' : undefined}
-                        className={`flex-1 flex flex-col items-center justify-center py-2.5 text-[10px] font-bold gap-1 transition-colors
-              ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-700'}`}
+                        className={commonClasses}
                     >
                         <Icon size={20} />
                         {label}
@@ -256,6 +300,7 @@ interface DashboardLayoutProps {
     userInitials?: string;
     userName?: string;
     userTier?: string;
+    navItems?: NavItemType[];
 }
 
 export default function DashboardLayout({
@@ -263,13 +308,14 @@ export default function DashboardLayout({
     userInitials = 'U',
     userName = 'User',
     userTier = 'Standard Account',
+    navItems = defaultNavItems
 }: DashboardLayoutProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans">
             {/* Desktop sidebar */}
-            <Sidebar userInitials={userInitials} userName={userName} userTier={userTier} />
+            <Sidebar userInitials={userInitials} userName={userName} userTier={userTier} items={navItems} />
 
             {/* Mobile top bar */}
             <MobileTopBar
@@ -285,10 +331,11 @@ export default function DashboardLayout({
                 userInitials={userInitials}
                 userName={userName}
                 userTier={userTier}
+                items={navItems}
             />
 
             {/* Bottom nav (mobile only) */}
-            <BottomNav />
+            <BottomNav items={navItems} />
 
             {/* Main content */}
             <main className="md:ml-52 min-h-screen pb-20 md:pb-0">

@@ -68,138 +68,132 @@ export default function NGOPortalPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f4f7fe] flex text-[#2b3674] font-sans">
-            {/* Left side - Decorative */}
-            <div className="hidden lg:flex w-1/2 bg-[#1a56db] relative flex-col justify-center items-center overflow-hidden p-12">
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-white opacity-10 blur-[100px]" />
-                <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-[#05cd99] opacity-20 blur-[80px]" />
-                
-                <div className="relative z-10 max-w-lg text-white">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 shadow-sm text-sm font-bold mb-8">
-                        <span className="flex h-2 w-2 rounded-full bg-[#05cd99]"></span>
-                        EduAble Backoffice
-                    </div>
-                    <h1 className="text-5xl font-extrabold leading-[1.1] tracking-tight mb-6">
-                        Manage <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">Inclusive</span> Education.
-                    </h1>
-                    <p className="text-xl text-blue-100/80 leading-relaxed mb-12">
-                        Upload accessible courses, manage student progress, and utilize server-side AI for automatic WCAG compliance.
-                    </p>
-                    
-                    {/* Visual Card */}
-                    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                            <h3 className="font-bold text-lg">Platform Status</h3>
-                            <span className="bg-[#05cd99]/20 text-[#05cd99] px-3 py-1 rounded-full text-xs font-bold">Online</span>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">🧠</div>
-                                <div>
-                                    <div className="text-sm font-bold">AI Processing Engine</div>
-                                    <div className="text-xs text-blue-100/60">Active & Ready</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">☁️</div>
-                                <div>
-                                    <div className="text-sm font-bold">Cloud Storage Link</div>
-                                    <div className="text-xs text-blue-100/60">Connected</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right side - Login Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-16 relative">
-                <Link href="/" className="absolute top-6 right-6 lg:top-10 lg:right-10 text-sm font-bold text-[#a3aed1] hover:text-[#1a56db] transition-colors">
-                    ← Back to Learner App
-                </Link>
-
-                <div className="w-full max-w-md">
-                    <div className="text-center lg:text-left mb-10">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1a56db] to-[#0ea5e9] flex items-center justify-center text-white font-bold text-2xl shadow-lg mb-6 lg:mx-0 mx-auto">
+        <div className="min-h-screen bg-background flex items-center justify-center px-4 py-16">
+            <div className="w-full max-w-md">
+                {/* Logo & Back */}
+                <div className="text-center mb-8 relative">
+                    <Link href="/" className="absolute -top-10 left-1/2 -translate-x-1/2 text-sm font-bold text-muted-foreground hover:text-primary transition-colors">
+                        ← Back to Learner App
+                    </Link>
+                    <div className="inline-flex items-center gap-2 text-primary font-extrabold text-2xl mb-6">
+                        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-primary-foreground">
                             E
                         </div>
-                        <h2 className="text-3xl font-extrabold tracking-tight mb-2">NGO Portal {mode === 'login' ? 'Login' : 'Registration'}</h2>
-                        <p className="text-[#a3aed1]">Secure access for educators and administrators.</p>
+                        EduAble
                     </div>
+                    <h1 className="text-2xl font-extrabold text-foreground mb-1">
+                        NGO Partner Portal
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Secure access for educators and administrators.
+                    </p>
+                </div>
 
+                <div className="bg-card border border-border rounded-2xl shadow-xl p-8">
+                    {/* API Error Banner */}
                     {apiError && (
-                        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600 font-medium font-sans">
+                        <div role="alert" aria-live="assertive" className="mb-5 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-sm text-destructive font-medium">
                             {apiError}
                         </div>
                     )}
 
-                    <div className="flex p-1 bg-[#f4f7fe] rounded-xl mb-8 border border-[#e0e5f2]">
+                    {/* Toggle */}
+                    <div className="flex p-1 bg-muted rounded-xl mb-6 border border-border">
                         <button
+                            type="button"
                             onClick={() => { setMode('login'); setErrors({}); setApiError(''); }}
-                            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white text-[#1a56db] shadow-sm' : 'text-[#a3aed1] hover:text-[#2b3674]'}`}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Sign In
                         </button>
                         <button
+                            type="button"
                             onClick={() => { setMode('register'); setErrors({}); setApiError(''); }}
-                            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${mode === 'register' ? 'bg-white text-[#1a56db] shadow-sm' : 'text-[#a3aed1] hover:text-[#2b3674]'}`}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${mode === 'register' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Register NGO
                         </button>
                     </div>
 
-                    <form onSubmit={handleSubmit} noValidate>
+                    <form onSubmit={handleSubmit} noValidate aria-label={`${mode === 'login' ? 'Sign in' : 'Register'} form`}>
                         {mode === 'register' && (
                             <div className="mb-5">
-                                <label htmlFor={nameId} className="block text-sm font-bold mb-1.5">NGO / Organization Name</label>
+                                <label htmlFor={nameId} className="block text-sm font-semibold text-foreground mb-1.5">
+                                    NGO / Organization Name <span aria-hidden="true" className="text-destructive">*</span>
+                                </label>
                                 <input
-                                    id={nameId} type="text"
-                                    value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                                    className={`w-full h-12 px-4 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-[#1a56db]/50 ${errors.name ? 'border-red-400' : 'border-[#e0e5f2]'}`}
+                                    id={nameId}
+                                    type="text"
+                                    value={form.name}
+                                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                                    className={`w-full h-11 px-4 rounded-xl border bg-background text-foreground text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary ${errors.name ? 'border-destructive' : 'border-border'}`}
                                 />
-                                {errors.name && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.name}</p>}
+                                {errors.name && <p className="mt-1.5 text-xs text-destructive font-medium">{errors.name}</p>}
                             </div>
                         )}
 
                         <div className="mb-5">
-                            <label htmlFor={emailId} className="block text-sm font-bold mb-1.5">Work Email Address</label>
+                            <label htmlFor={emailId} className="block text-sm font-semibold text-foreground mb-1.5">
+                                Work Email Address <span aria-hidden="true" className="text-destructive">*</span>
+                            </label>
                             <input
-                                id={emailId} type="email"
-                                value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                                className={`w-full h-12 px-4 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-[#1a56db]/50 ${errors.email ? 'border-red-400' : 'border-[#e0e5f2]'}`}
+                                id={emailId}
+                                type="email"
+                                value={form.email}
+                                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                                className={`w-full h-11 px-4 rounded-xl border bg-background text-foreground text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary ${errors.email ? 'border-destructive' : 'border-border'}`}
+                                placeholder="ngo@example.com"
                             />
-                            {errors.email && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.email}</p>}
+                            {errors.email && <p className="mt-1.5 text-xs text-destructive font-medium">{errors.email}</p>}
                         </div>
 
-                        <div className="mb-6">
-                            <label htmlFor={passwordId} className="block text-sm font-bold mb-1.5">Password</label>
+                        <div className={mode === 'register' ? 'mb-5' : 'mb-6'}>
+                            <label htmlFor={passwordId} className="block text-sm font-semibold text-foreground mb-1.5">
+                                Password <span aria-hidden="true" className="text-destructive">*</span>
+                            </label>
                             <input
-                                id={passwordId} type="password"
-                                value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                                className={`w-full h-12 px-4 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-[#1a56db]/50 ${errors.password ? 'border-red-400' : 'border-[#e0e5f2]'}`}
+                                id={passwordId}
+                                type="password"
+                                value={form.password}
+                                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                                className={`w-full h-11 px-4 rounded-xl border bg-background text-foreground text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary ${errors.password ? 'border-destructive' : 'border-border'}`}
+                                placeholder="••••••••"
                             />
-                            {errors.password && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.password}</p>}
+                            {errors.password && <p className="mt-1.5 text-xs text-destructive font-medium">{errors.password}</p>}
                         </div>
 
                         {mode === 'register' && (
-                            <div className="mb-8">
-                                <label htmlFor={confirmPasswordId} className="block text-sm font-bold mb-1.5">Confirm Password</label>
+                            <div className="mb-6">
+                                <label htmlFor={confirmPasswordId} className="block text-sm font-semibold text-foreground mb-1.5">
+                                    Confirm Password <span aria-hidden="true" className="text-destructive">*</span>
+                                </label>
                                 <input
-                                    id={confirmPasswordId} type="password"
-                                    value={form.confirmPassword} onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
-                                    className={`w-full h-12 px-4 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-[#1a56db]/50 ${errors.confirmPassword ? 'border-red-400' : 'border-[#e0e5f2]'}`}
+                                    id={confirmPasswordId}
+                                    type="password"
+                                    value={form.confirmPassword}
+                                    onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                                    className={`w-full h-11 px-4 rounded-xl border bg-background text-foreground text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary ${errors.confirmPassword ? 'border-destructive' : 'border-border'}`}
+                                    placeholder="••••••••"
                                 />
-                                {errors.confirmPassword && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.confirmPassword}</p>}
+                                {errors.confirmPassword && <p className="mt-1.5 text-xs text-destructive font-medium">{errors.confirmPassword}</p>}
                             </div>
                         )}
 
                         <button
-                            type="submit" disabled={loading}
-                            className="w-full h-14 rounded-xl bg-[#1a56db] text-white font-bold text-base hover:bg-[#1a56db]/90 focus:outline-none focus:ring-4 focus:ring-[#1a56db]/20 transition-all shadow-[0_4px_12px_rgba(26,86,219,0.2)] disabled:opacity-70 flex justify-center items-center"
+                            type="submit"
+                            disabled={loading}
+                            aria-busy={loading}
+                            className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {loading ? (
-                                <span className="animate-spin w-6 h-6 border-4 border-white/30 border-t-white rounded-full"></span>
-                            ) : mode === 'login' ? 'Secure Login' : 'Create NGO Account'}
+                                <span className="flex items-center justify-center gap-2">
+                                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                    </svg>
+                                    Processing…
+                                </span>
+                            ) : mode === 'login' ? 'Secure Login' : 'Create Account'}
                         </button>
                     </form>
                 </div>
