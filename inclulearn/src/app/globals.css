@@ -49,29 +49,30 @@
 
 /* ---- HIGH CONTRAST — override ALL color tokens ---- */
 :root[data-theme="high-contrast"] {
-  --background:  oklch(0 0 0);
-  --foreground:  oklch(1 0 0);
-  --card:        oklch(0.07 0 0);
-  --card-foreground: oklch(1 0 0);
-  --popover:     oklch(0.07 0 0);
-  --popover-foreground: oklch(1 0 0);
-  --primary:     oklch(0.72 0.2 260);   /* bright accessible blue */
-  /* white on blue for maximum contrast */
-  --primary-foreground: oklch(1 0 0);   /* white text on blue primary */
-  --secondary:   oklch(0.15 0 0);
-  --secondary-foreground: oklch(1 0 0);
-  --muted:       oklch(0.12 0 0);
-  --muted-foreground: oklch(0.88 0 0);
-  --accent:      oklch(0.15 0 0);
-  --accent-foreground: oklch(1 0 0);
-  --border:      oklch(0.6 0 0);
-  --input:       oklch(0.2 0 0);
-  --ring:        oklch(0.9 0 0);
-  /* Hero becomes black */
-  --hero-from: #000;
-  --hero-via:  #050505;
-  --hero-to:   #000;
-  --color-focus-ring: #ffff00;
+  --background:  oklch(0.13 0.04 260);    /* Deep Navy Space */
+  --foreground:  oklch(0.90 0.15 195);    /* Neon Cyan */
+  --card:        oklch(0.16 0.04 260);
+  --card-foreground: oklch(0.90 0.15 195);
+  --popover:     oklch(0.16 0.04 260);
+  --popover-foreground: oklch(0.90 0.15 195);
+  --primary:     oklch(0.90 0.15 195);
+  --primary-foreground: oklch(0.13 0.04 260);
+  --secondary:   oklch(0.20 0.04 260);
+  --secondary-foreground: oklch(0.90 0.15 195);
+  --muted:       oklch(0.20 0.04 260);
+  --muted-foreground: oklch(0.80 0.10 195);
+  --accent:      oklch(0.20 0.04 260);
+  --accent-foreground: oklch(0.90 0.15 195);
+  --border:      oklch(0.50 0.10 195);
+  --input:       oklch(0.30 0.05 260);
+  --ring:        oklch(0.90 0.15 195);
+
+  /* Hero becomes deep navy */
+  --hero-from: #040d21;
+  --hero-via:  #06132d;
+  --hero-to:   #040d21;
+
+  --color-focus-ring: #00e5ff;
 }
 
 .dark {
@@ -125,6 +126,364 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased selection:bg-blue-600/20 selection:text-blue-900;
+  }
+}
+
+/* ── Accessibility Global Overrides ────────────────── */
+
+/* High Contrast Mode Global Overrides */
+:root[data-theme="high-contrast"] body {
+  background-color: #040d21 !important;
+  color: #00e5ff !important;
+}
+
+/* Blinkit Style Immediate Transition Focus Theme */
+body.theme-transitioning,
+body.theme-transitioning .bg-card,
+body.theme-transitioning .bg-popover {
+  transition: background-color 0.4s ease-out, color 0.4s ease-out !important;
+}
+
+/* Base Fix for internal components inheriting Body colors correctly */
+[class*="theme-blinkit-"] div:not([role="button"]):not(.bg-primary):not(.mobile-drawer-bg),
+[class*="theme-blinkit-"] section,
+[class*="theme-blinkit-"] main,
+[class*="theme-blinkit-"] aside,
+[class*="theme-blinkit-"] nav,
+[class*="theme-blinkit-"] header:not(.mobile-drawer-bg),
+[class*="theme-blinkit-"] footer {
+  background-color: transparent !important;
+  border-color: currentColor !important;
+}
+
+[class*="theme-blinkit-"] p,
+[class*="theme-blinkit-"] h1,
+[class*="theme-blinkit-"] h2,
+[class*="theme-blinkit-"] h3,
+[class*="theme-blinkit-"] h4,
+[class*="theme-blinkit-"] h5,
+[class*="theme-blinkit-"] h6,
+[class*="theme-blinkit-"] span:not(.absolute),
+[class*="theme-blinkit-"] label,
+[class*="theme-blinkit-"] a,
+[class*="theme-blinkit-"] li {
+  color: inherit !important;
+}
+
+body.theme-blinkit-high-contrast {
+  background-color: #000000 !important;
+  background-image: linear-gradient(to bottom right, #000000, #001a4d) !important;
+  color: #ffffff !important;
+}
+
+body.theme-blinkit-high-contrast div:not(.mobile-drawer-bg),
+body.theme-blinkit-high-contrast section,
+body.theme-blinkit-high-contrast main,
+body.theme-blinkit-high-contrast header:not(.mobile-drawer-bg),
+body.theme-blinkit-high-contrast aside:not(.mobile-drawer-bg),
+body.theme-blinkit-high-contrast nav {
+  background-color: transparent !important;
+  border-color: #FFD700 !important;
+}
+
+body.theme-blinkit-high-contrast .mobile-drawer-bg {
+  background-color: #000000 !important;
+}
+
+body.theme-blinkit-high-contrast p,
+body.theme-blinkit-high-contrast h1,
+body.theme-blinkit-high-contrast h2,
+body.theme-blinkit-high-contrast h3,
+body.theme-blinkit-high-contrast h4,
+body.theme-blinkit-high-contrast h5,
+body.theme-blinkit-high-contrast h6,
+body.theme-blinkit-high-contrast span:not(.absolute),
+body.theme-blinkit-high-contrast label,
+body.theme-blinkit-high-contrast li {
+  color: #ffffff !important;
+}
+
+body.theme-blinkit-high-contrast button.bg-primary,
+body.theme-blinkit-high-contrast [role="button"].bg-primary {
+  background-color: #FFD700 !important;
+  color: #000000 !important;
+  border: 3px solid #FFD700 !important;
+  border-radius: 12px !important;
+  min-height: 56px !important;
+  font-weight: 900 !important;
+  font-size: 1.125rem !important;
+}
+
+body.theme-blinkit-high-contrast button.bg-primary *,
+body.theme-blinkit-high-contrast [role="button"].bg-primary * {
+  color: #000000 !important;
+}
+
+body.theme-blinkit-high-contrast *:focus-visible {
+  outline: 4px solid #FFD700 !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 15px #FFD700 !important;
+}
+
+@keyframes pulseAnim {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+/* 2. Deaf Users Theme — “Visual Pulse Mode” */
+body.theme-blinkit-deaf {
+  background-color: #FAFAFF !important; /* Crisp, slightly cool white */
+  color: #0F172A !important;
+}
+body.theme-blinkit-deaf div.bg-card,
+body.theme-blinkit-deaf div.bg-popover {
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 20px rgba(109, 40, 217, 0.08) !important;
+  position: relative;
+}
+/* Simulate gradient border for energetic card feel */
+body.theme-blinkit-deaf div.bg-card::before,
+body.theme-blinkit-deaf div.bg-popover::before {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  background: linear-gradient(135deg, rgba(109, 40, 217, 0.3), rgba(37, 99, 235, 0.3));
+  border-radius: 18px;
+  z-index: -1;
+}
+
+body.theme-blinkit-deaf button.bg-primary,
+body.theme-blinkit-deaf [role="button"].bg-primary {
+  background: linear-gradient(135deg, #6D28D9, #2563EB) !important;
+  color: #FFFFFF !important;
+  border-radius: 12px !important;
+  position: relative;
+  overflow: hidden;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(109, 40, 217, 0.3) !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease !important;
+}
+body.theme-blinkit-deaf button.bg-primary::after,
+body.theme-blinkit-deaf [role="button"].bg-primary::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease;
+}
+body.theme-blinkit-deaf *:focus-visible::after,
+body.theme-blinkit-deaf button.bg-primary:active::after {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  transition: transform 0s, opacity 0s;
+}
+body.theme-blinkit-deaf button.bg-primary:hover,
+body.theme-blinkit-deaf [role="button"].bg-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(109, 40, 217, 0.4) !important;
+}
+body.theme-blinkit-deaf *:focus-visible {
+  outline: 4px solid #00f6ff !important;
+  outline-offset: 4px !important;
+}
+
+/* 3. Cognitive Friendly Theme — “Calm Learning Mode” */
+body.theme-blinkit-cognitive {
+  background-color: #F8FAF5 !important;
+  color: #2D3748 !important;
+  font-family: 'OpenDyslexic', 'Lexend', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+body.theme-blinkit-cognitive div.bg-card,
+body.theme-blinkit-cognitive div.bg-popover {
+  background-color: #FFFFFF !important; /* Soft white on cream base */
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
+}
+body.theme-blinkit-cognitive button.bg-primary,
+body.theme-blinkit-cognitive [role="button"].bg-primary {
+  background-color: #A3C9E2 !important; /* Soft pastel blue */
+  color: #1A365D !important;
+  font-weight: 700 !important;
+  padding: 12px 28px !important;
+  border-radius: 9999px !important; /* Pill shape */
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 4px 10px rgba(163, 201, 226, 0.4), inset 0 2px 0 rgba(255,255,255,0.4) !important;
+  transition: all 0.3s ease !important;
+}
+body.theme-blinkit-cognitive button.bg-primary:hover,
+body.theme-blinkit-cognitive [role="button"].bg-primary:hover {
+  background-color: #bae6fd !important;
+  box-shadow: 0 6px 14px rgba(163, 201, 226, 0.5), inset 0 2px 0 rgba(255,255,255,0.6) !important;
+  transform: translateY(-1px) !important;
+}
+body.theme-blinkit-cognitive *:focus-visible {
+  outline: 3px solid #64748B !important;
+  outline-offset: 4px !important;
+}
+
+/* 4. Motor Disability Theme — “EasyReach Mode” */
+body.theme-blinkit-motor {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+body.theme-blinkit-motor div.bg-card,
+body.theme-blinkit-motor div.bg-popover {
+  border: 2px solid #E2E8F0 !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important;
+}
+body.theme-blinkit-motor button,
+body.theme-blinkit-motor [role="button"],
+body.theme-blinkit-motor input,
+body.theme-blinkit-motor select {
+  min-height: 64px !important; /* Large but balanced */
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+  font-size: 1.125rem !important;
+  border-radius: 16px !important;
+}
+body.theme-blinkit-motor button.bg-primary,
+body.theme-blinkit-motor [role="button"].bg-primary {
+  background-color: #2563EB !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+body.theme-blinkit-motor button.bg-primary:hover,
+body.theme-blinkit-motor [role="button"].bg-primary:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.35) !important;
+}
+body.theme-blinkit-motor *:focus-visible {
+  outline: 4px solid #F59E0B !important;
+  outline-offset: 4px !important;
+}
+
+/* 5. Color Blind Friendly Theme — “Pattern Vision Mode” */
+body.theme-blinkit-colorblind {
+  background-color: #1F2937 !important;
+  color: #F9FAFB !important;
+}
+body.theme-blinkit-colorblind div.bg-card,
+body.theme-blinkit-colorblind div.bg-popover {
+  background-color: #374151 !important;
+  border: 2px solid #9CA3AF !important;
+}
+body.theme-blinkit-colorblind button.bg-primary,
+body.theme-blinkit-colorblind [role="button"].bg-primary {
+  background-color: #4B5563 !important; 
+  color: #FFFFFF !important;
+  border: 4px dashed #D1D5DB !important; /* Distinctive pattern border */
+  border-radius: 4px !important; /* Square shape */
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 20px) !important;
+}
+body.theme-blinkit-colorblind *:focus-visible {
+  outline: 4px dotted #F3F4F6 !important;
+  outline-offset: 4px !important;
+}
+
+:root[data-theme="high-contrast"] div:not(.mobile-drawer-bg),
+:root[data-theme="high-contrast"] section,
+:root[data-theme="high-contrast"] main,
+:root[data-theme="high-contrast"] nav,
+:root[data-theme="high-contrast"] header:not(.mobile-drawer-bg),
+:root[data-theme="high-contrast"] footer {
+  background-color: transparent !important;
+  border-color: #00e5ff !important;
+}
+
+:root[data-theme="high-contrast"] .mobile-drawer-bg {
+  background-color: #040d21 !important;
+}
+
+:root[data-theme="high-contrast"] p,
+:root[data-theme="high-contrast"] h1,
+:root[data-theme="high-contrast"] h2,
+:root[data-theme="high-contrast"] h3,
+:root[data-theme="high-contrast"] h4,
+:root[data-theme="high-contrast"] h5,
+:root[data-theme="high-contrast"] h6,
+:root[data-theme="high-contrast"] span:not(.absolute),
+:root[data-theme="high-contrast"] label,
+:root[data-theme="high-contrast"] a,
+:root[data-theme="high-contrast"] li {
+  color: #00e5ff !important;
+}
+
+:root[data-theme="high-contrast"] *:not(button):not(input):not(select):not(textarea) {
+  border-color: rgba(0, 229, 255, 0.4) !important;
+}
+
+:root[data-theme="high-contrast"] button,
+:root[data-theme="high-contrast"] [role="button"],
+body.theme-blinkit-high-contrast button,
+body.theme-blinkit-high-contrast [role="button"] {
+  background-color: transparent !important;
+  color: #00e5ff !important;
+  border: 2px solid #00e5ff !important;
+}
+
+:root[data-theme="high-contrast"] button.bg-primary,
+:root[data-theme="high-contrast"] [role="button"].bg-primary,
+body.theme-blinkit-high-contrast button.bg-primary,
+body.theme-blinkit-high-contrast [role="button"].bg-primary {
+  background-color: #00e5ff !important;
+  color: #040d21 !important;
+}
+
+:root[data-theme="high-contrast"] button:disabled,
+:root[data-theme="high-contrast"] [role="button"]:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+:root[data-theme="high-contrast"] button.bg-primary *,
+:root[data-theme="high-contrast"] [role="button"].bg-primary * {
+  color: #040d21 !important;
+}
+
+:root[data-theme="high-contrast"] input,
+:root[data-theme="high-contrast"] select,
+:root[data-theme="high-contrast"] textarea {
+  background-color: #06132d !important;
+  color: #00e5ff !important;
+  border: 2px solid #00e5ff !important;
+}
+
+:root[data-theme="high-contrast"] svg {
+  color: inherit;
+}
+
+/* Base interactive transitions */
+.reduce-motion * {
+  @apply !transition-none !animate-none !duration-0;
+  scroll-behavior: auto !important;
+}
+
+/* Base interactive transitions */
+.transition-colors {
+  @apply duration-200;
+}
+.transition-all {
+  @apply duration-200;
 }
 
 /* ---- Reduce Motion ---- */

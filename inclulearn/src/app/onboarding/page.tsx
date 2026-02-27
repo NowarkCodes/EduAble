@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi, OnboardingData } from '@/lib/api';
+import { useAccessibility } from '@/context/AccessibilityContext';
+import Dropdown from '@/components/Dropdown';
 
 /* ── Types ────────────────────────────────────────── */
 type Step1Data = { name: string; contactNumber: string; age: string; preferredLanguage: string };
@@ -14,40 +16,44 @@ type Prefs = Record<string, boolean | string>;
 const STEPS = ['Personal', 'Disabilities', 'Preferences', 'Review'];
 
 const DISABILITIES: { key: DisabilityKey; label: string; emoji: string }[] = [
-    { key: 'blind_low_vision', label: 'Blind / Low Vision', emoji: '👁️' },
-    { key: 'deaf_hard_of_hearing', label: 'Deaf / Hard of Hearing', emoji: '🔇' },
-    { key: 'cognitive_disability', label: 'Cognitive Disability', emoji: '🧠' },
-    { key: 'motor_disability', label: 'Motor Disability', emoji: '♿' },
-    { key: 'multiple_disabilities', label: 'Multiple Disabilities', emoji: '🌟' },
+    { key: 'blind_low_vision', label: 'High Contrast Theme (Blind)', emoji: '👁️' },
+    { key: 'deaf_hard_of_hearing', label: 'Visual Pulse Mode (Deaf / HoH)', emoji: '🔇' },
+    { key: 'cognitive_disability', label: 'Calm Learning Mode (Cognitive)', emoji: '🧠' },
+    { key: 'motor_disability', label: 'EasyReach Mode (Motor)', emoji: '♿' },
+    { key: 'multiple_disabilities', label: 'Pattern Vision Mode (Color Blind)', emoji: '🎨' },
 ];
 
 const LANGUAGES = ['English', 'Hindi', 'Spanish', 'French', 'Mandarin', 'Arabic', 'Portuguese', 'Other'];
 
+// Theme function removed as we now use AccessibilityContext
+
 /* ── Dynamic Questions ────────────────────────────── */
 type Question = { key: string; label: string; type: 'boolean' | 'select'; options?: string[] };
 
-function questionsFor(disabilities: DisabilityKey[]): Question[] {
+function questionsFor(disability: DisabilityKey | null): Question[] {
     const q: Question[] = [];
-    if (disabilities.includes('blind_low_vision')) {
+    if (!disability) return q;
+
+    if (disability === 'blind_low_vision') {
         q.push(
             { key: 'screenReader', label: 'Do you use a screen reader?', type: 'boolean' },
             { key: 'preferredAudioSpeed', label: 'Preferred audio speed?', type: 'select', options: ['slow', 'normal', 'fast'] },
             { key: 'voiceNavigation', label: 'Enable voice navigation?', type: 'boolean' },
         );
     }
-    if (disabilities.includes('deaf_hard_of_hearing')) {
+    if (disability === 'deaf_hard_of_hearing') {
         q.push(
             { key: 'captionSize', label: 'Caption size preference?', type: 'select', options: ['small', 'medium', 'large'] },
             { key: 'signLanguageSupport', label: 'Require sign language support?', type: 'boolean' },
         );
     }
-    if (disabilities.includes('motor_disability')) {
+    if (disability === 'motor_disability') {
         q.push(
             { key: 'keyboardOnlyNavigation', label: 'Keyboard-only navigation required?', type: 'boolean' },
             { key: 'voiceCommands', label: 'Voice commands needed?', type: 'boolean' },
         );
     }
-    if (disabilities.includes('cognitive_disability')) {
+    if (disability === 'cognitive_disability') {
         q.push(
             { key: 'dyslexiaMode', label: 'Enable dyslexia-friendly mode?', type: 'boolean' },
             { key: 'simplifiedInterface', label: 'Simplified interface required?', type: 'boolean' },
@@ -72,7 +78,7 @@ function StepIndicator({ current }: { current: number }) {
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-200 shrink-0
                                         ${done ? 'bg-primary border-primary text-primary-foreground shadow-sm' :
                                             active ? 'border-primary bg-primary/10 text-primary shadow-sm' :
-                                                'border-border bg-background text-muted-foreground'}`}
+                                                'border-border bg-background text-foreground'}`}
                                 >
                                     {done ? (
                                         <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -122,14 +128,17 @@ const inputCls =
 export default function OnboardingPage() {
     const router = useRouter();
     const { user } = useAuth();
+    const { setBlinkitTheme } = useAccessibility();
 
     const [step, setStep] = useState(0);
     const [step1, setStep1] = useState<Step1Data>({ name: user?.name || '', contactNumber: '', age: '', preferredLanguage: 'English' });
-    const [selectedDisabilities, setSelectedDisabilities] = useState<DisabilityKey[]>([]);
+    const [selectedDisability, setSelectedDisability] = useState<DisabilityKey | null>(null);
     const [prefs, setPrefs] = useState<Prefs>({});
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Step1Data, string>>>({});
+
+
 
     const validateStep1 = (): boolean => {
         const errors: Partial<Record<keyof Step1Data, string>> = {};
@@ -157,8 +166,22 @@ export default function OnboardingPage() {
         return Object.keys(errors).length === 0;
     };
 
-    const toggleDisability = (key: DisabilityKey) =>
-        setSelectedDisabilities(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
+    const selectDisability = (key: DisabilityKey) => {
+        const next = selectedDisability === key ? null : key;
+        setSelectedDisability(next);
+
+        // Map the selected key to a theme class and set it globally
+        let targetTheme = ''; // Empty string removes extra theme class
+        if (next) {
+            if (next === 'blind_low_vision') targetTheme = 'theme-blinkit-high-contrast';
+            else if (next === 'deaf_hard_of_hearing') targetTheme = 'theme-blinkit-deaf';
+            else if (next === 'cognitive_disability') targetTheme = 'theme-blinkit-cognitive';
+            else if (next === 'motor_disability') targetTheme = 'theme-blinkit-motor';
+            else if (next === 'multiple_disabilities') targetTheme = 'theme-blinkit-colorblind';
+        }
+
+        setBlinkitTheme(targetTheme);
+    };
 
     const setPref = (key: string, value: boolean | string) =>
         setPrefs(p => ({ ...p, [key]: value }));
@@ -172,7 +195,7 @@ export default function OnboardingPage() {
                 contactNumber: step1.contactNumber,
                 age: step1.age ? Number(step1.age) : null,
                 preferredLanguage: step1.preferredLanguage,
-                disabilityType: selectedDisabilities,
+                disabilityType: selectedDisability ? [selectedDisability] : [],
                 accessibilityPreferences: prefs,
             };
             await profileApi.create(payload);
@@ -189,32 +212,32 @@ export default function OnboardingPage() {
         }
     };
 
-    const questions = questionsFor(selectedDisabilities);
+    const questions = questionsFor(selectedDisability);
 
     return (
-        <div className="min-h-screen bg-muted/40 flex items-start justify-center py-10 px-4">
-            <div className="w-full max-w-xl">
+        <div className="min-h-screen bg-muted/40 transition-colors duration-400 theme-responsive-bg flex items-start justify-center py-10 px-4">
+            <div className="w-full max-w-xl transition-all duration-400">
 
                 {/* Logo + header */}
                 <div className="text-center mb-6">
                     <a href="/" className="inline-flex items-center gap-2 text-primary font-extrabold text-lg mb-5">
-                        <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0 transition-transform hover:scale-105">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                             </svg>
                         </div>
                         EduAble
                     </a>
-                    <h1 className="text-xl sm:text-2xl font-extrabold text-foreground leading-tight">
+                    <h1 className="text-xl sm:text-2xl font-extrabold text-foreground leading-tight transition-colors">
                         Set up your accessibility profile
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-1.5">
+                    <p className="text-sm text-muted-foreground mt-1.5 transition-colors">
                         Personalise your learning experience in a few steps.
                     </p>
                 </div>
 
                 {/* Card */}
-                <div className="bg-card border border-border rounded-2xl shadow-sm p-5 sm:p-8">
+                <div className="bg-card border border-border rounded-2xl shadow-sm p-5 sm:p-8 transition-all duration-400">
                     <StepIndicator current={step} />
 
                     {/* ── STEP 0: Personal Info ── */}
@@ -280,14 +303,13 @@ export default function OnboardingPage() {
                                 </Field>
                                 <div className="sm:col-span-2">
                                     <Field label="Preferred Language" htmlFor="s1-lang">
-                                        <select
+                                        <Dropdown
                                             id="s1-lang"
                                             value={step1.preferredLanguage}
-                                            onChange={e => setStep1(s => ({ ...s, preferredLanguage: e.target.value }))}
-                                            className={inputCls}
-                                        >
-                                            {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                                        </select>
+                                            onChange={(val) => setStep1(s => ({ ...s, preferredLanguage: val }))}
+                                            options={LANGUAGES}
+                                            className="w-full"
+                                        />
                                     </Field>
                                 </div>
                             </div>
@@ -303,7 +325,7 @@ export default function OnboardingPage() {
                                 <legend className="sr-only">Select your disability type(s)</legend>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {DISABILITIES.map(d => {
-                                        const checked = selectedDisabilities.includes(d.key);
+                                        const checked = selectedDisability === d.key;
                                         return (
                                             <label
                                                 key={d.key}
@@ -313,10 +335,11 @@ export default function OnboardingPage() {
                                                         : 'border-border bg-background hover:border-primary/40 hover:bg-muted/50'}`}
                                             >
                                                 <input
-                                                    type="checkbox"
+                                                    type="radio"
+                                                    name="disability-selection"
                                                     checked={checked}
-                                                    onChange={() => toggleDisability(d.key)}
-                                                    className="w-4 h-4 rounded accent-primary shrink-0"
+                                                    onChange={() => selectDisability(d.key)}
+                                                    className="w-4 h-4 rounded-full accent-primary shrink-0 transition-transform"
                                                     aria-label={d.label}
                                                 />
                                                 <span className="text-lg leading-none" aria-hidden="true">{d.emoji}</span>
@@ -364,16 +387,12 @@ export default function OnboardingPage() {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <select
-                                                aria-label={q.label}
+                                            <Dropdown
                                                 value={(prefs[q.key] as string) || q.options![0]}
-                                                onChange={e => setPref(q.key, e.target.value)}
-                                                className="h-9 px-3 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                                            >
-                                                {q.options!.map(o => (
-                                                    <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>
-                                                ))}
-                                            </select>
+                                                onChange={(val) => setPref(q.key, val)}
+                                                options={q.options!.map(o => ({ label: o.charAt(0).toUpperCase() + o.slice(1), value: o }))}
+                                                className="w-full "
+                                            />
                                         )}
                                     </div>
                                 ))}
@@ -384,7 +403,7 @@ export default function OnboardingPage() {
                     {/* ── STEP 3: Review ── */}
                     {step === 3 && (
                         <section aria-labelledby="step4-heading">
-                            <h2 id="step4-heading" className="text-base font-bold text-foreground mb-5">Review Your Profile</h2>
+                            <h2 id="step4-heading" className="text-xl font-bold text-foreground mb-6">Review Your Profile</h2>
 
                             {apiError && (
                                 <div role="alert" aria-live="assertive" className="mb-4 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive">
@@ -392,11 +411,11 @@ export default function OnboardingPage() {
                                 </div>
                             )}
 
-                            <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-4">
                                 {/* Personal */}
-                                <div className="rounded-xl border border-border p-4">
-                                    <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-3">Personal Details</p>
-                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
+                                <div className="rounded-xl border border-primary/40 p-5">
+                                    <p className="text-xs font-bold text-violet-500 uppercase tracking-[0.1em] mb-4">Personal Details</p>
+                                    <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
                                         {[
                                             ['Name', step1.name || '—'],
                                             ['Contact', step1.contactNumber || '—'],
@@ -404,49 +423,51 @@ export default function OnboardingPage() {
                                             ['Language', step1.preferredLanguage],
                                         ].map(([k, v]) => (
                                             <div key={k}>
-                                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">{k}</dt>
-                                                <dd className="text-sm text-foreground font-semibold">{v}</dd>
+                                                <dt className="text-sm text-primary font-semibold mb-1">{k}</dt>
+                                                <dd className="text-base text-violet-500 font-medium">{v}</dd>
                                             </div>
                                         ))}
                                     </dl>
                                 </div>
 
                                 {/* Disabilities */}
-                                <div className="rounded-xl border border-border p-4">
-                                    <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-3">Disabilities</p>
-                                    {selectedDisabilities.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">None selected</p>
+                                <div className="rounded-xl border border-primary/40 p-5">
+                                    <p className="text-xs font-bold text-foreground uppercase tracking-[0.1em] mb-4">Disability Profile</p>
+                                    {!selectedDisability ? (
+                                        <p className="text-sm text-muted-foreground font-medium">None selected</p>
                                     ) : (
                                         <div className="flex flex-wrap gap-2">
-                                            {selectedDisabilities.map(d => {
-                                                const found = DISABILITIES.find(x => x.key === d);
-                                                return (
-                                                    <span key={d} className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-semibold px-2.5 py-1 rounded-full border border-primary/20">
-                                                        <span aria-hidden="true">{found?.emoji}</span>
-                                                        {found?.label}
+                                            {(() => {
+                                                const found = DISABILITIES.find(x => x.key === selectedDisability);
+                                                return found ? (
+                                                    <span key={selectedDisability} className="inline-flex items-center gap-2 bg-primary/10 text-foreground text-sm font-bold px-4 py-2 rounded-full border border-primary shadow-sm">
+                                                        <span aria-hidden="true" className="text-base">{found.emoji}</span>
+                                                        {found.label}
                                                     </span>
-                                                );
-                                            })}
+                                                ) : null;
+                                            })()}
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Preferences */}
-                                {Object.keys(prefs).length > 0 && (
-                                    <div className="rounded-xl border border-border p-4">
-                                        <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-3">Preferences</p>
-                                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-sm">
+                                <div className="rounded-xl border border-primary/40 p-5">
+                                    <p className="text-xs font-bold text-foreground uppercase tracking-[0.1em] mb-4">Preferences</p>
+                                    {Object.keys(prefs).length > 0 ? (
+                                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                                             {Object.entries(prefs).map(([k, v]) => (
                                                 <div key={k}>
-                                                    <dt className="text-xs text-muted-foreground font-medium mb-0.5 capitalize">
+                                                    <dt className="text-sm text-primary font-semibold mb-1 capitalize">
                                                         {k.replace(/([A-Z])/g, ' $1').trim()}
                                                     </dt>
-                                                    <dd className="text-foreground font-semibold">{String(v)}</dd>
+                                                    <dd className="text-base text-violet-500 font-medium">{String(v)}</dd>
                                                 </div>
                                             ))}
                                         </dl>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground font-medium">No preferences set</p>
+                                    )}
+                                </div>
                             </div>
                         </section>
                     )}
@@ -456,7 +477,7 @@ export default function OnboardingPage() {
                         <button
                             onClick={() => setStep(s => s - 1)}
                             disabled={step === 0}
-                            className="h-10 px-5 rounded-lg border border-border text-foreground font-medium text-sm hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="h-10 px-5 rounded-lg border border-border text-violet-500 text-foreground font-bold text-sm hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
                             aria-label="Go to previous step"
                         >
                             ← Back

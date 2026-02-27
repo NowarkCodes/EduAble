@@ -94,147 +94,203 @@ function LightningIcon() {
     );
 }
 
+const courseItems = [
+    { num: 1, title: 'Introduction to ARIA', time: '10:20', status: 'completed' },
+    { num: 4, title: 'ARIA Patterns & Best Practices', time: 'Current', status: 'active' },
+    { num: 5, title: 'Testing with Screen Readers', time: '18:45', status: 'locked' },
+    { num: 6, title: 'Capstone: Building Accessible Forms', time: '45:00', status: 'locked' },
+];
+
+const transcriptItems = [
+    { ts: '12:15', text: "Welcome back to Module 4. We've just covered the basic concepts of semantic markup.", active: false },
+    { ts: '12:30', text: "When using ARIA roles, it's essential to remember the first rule of ARIA: If you can use a native HTML element instead, do it. Native elements have built-in accessibility features.", active: false },
+    { ts: '12:45', text: "Now, let's look at how we can implement a 'live region'. A live region is an area where content updates without a page refresh, and it needs to be announced to screen reader users.", active: true },
+    { ts: '13:02', text: 'By adding aria-live="polite", the assistive technology will wait for the user to finish their current task before announcing the change.', active: false },
+    { ts: '13:20', text: 'Contrast this with "assertive", which interrupts immediately. Use assertive sparingly for critical errors or time-sensitive alerts.', active: false },
+];
+
 export default function CourseDetailPage() {
     const { user } = useAuth();
-    const initials = (user?.name ?? 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const initials = (user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+
+    // Transcript panel open/close on mobile
+    const [transcriptOpen, setTranscriptOpen] = useState(false);
 
     return (
         <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 md:py-8">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 md:py-8">
 
-                {/* Breadcrumb */}
-                <nav className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-6 uppercase tracking-wider">
-                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
-                    <span>›</span>
-                    <Link href="/courses" className="hover:text-blue-600 transition-colors">Web Accessibility</Link>
-                    <span>›</span>
-                    <span className="text-slate-900">ARIA Patterns & Best Practices</span>
+                {/* Breadcrumb — truncate gracefully on mobile */}
+                <nav className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold text-slate-500 mb-4 sm:mb-6 uppercase tracking-wider min-w-0 flex-wrap">
+                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors shrink-0">Dashboard</Link>
+                    <span aria-hidden="true">›</span>
+                    <Link href="/courses" className="hover:text-blue-600 transition-colors shrink-0 hidden sm:inline">Web Accessibility</Link>
+                    <span aria-hidden="true" className="hidden sm:inline">›</span>
+                    <span className="text-slate-900 truncate">ARIA Patterns &amp; Best Practices</span>
                 </nav>
 
                 {/* Header */}
-                <header className="mb-6">
-                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-2">Advanced CSS Accessibility</h1>
-                    <p className="text-slate-600 font-medium">Module 4: Accessible Rich Internet Applications (ARIA)</p>
+                <header className="mb-4 sm:mb-6">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 mb-1 sm:mb-2">Advanced CSS Accessibility</h1>
+                    <p className="text-sm sm:text-base text-slate-600 font-medium">Module 4: Accessible Rich Internet Applications (ARIA)</p>
                 </header>
 
-                <div className="flex flex-col xl:flex-row gap-6">
+                <div className="flex flex-col xl:flex-row gap-5 sm:gap-6">
 
-                    {/* Left Column (Video & Content) */}
-                    <div className="flex-1 min-w-0 flex flex-col gap-6">
+                    {/* ── Left Column ─────────────────────────────── */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-5 sm:gap-6">
 
-                        {/* Video Player Area */}
+                        {/* Video Player */}
                         <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-md relative aspect-video flex flex-col border border-slate-800">
 
-                            {/* Dummy Video Content */}
-                            <div className="flex-1 bg-[#4d6a52] flex items-center justify-center relative overflow-hidden text-center p-8">
-                                <span className="font-serif italic text-white/30 text-5xl md:text-8xl md:leading-tight -rotate-2 select-none">
+                            {/* Video content area */}
+                            <div className="flex-1 bg-[#4d6a52] flex items-center justify-center relative overflow-hidden text-center p-4 sm:p-8">
+                                <span className="font-serif italic text-white/30 text-4xl sm:text-5xl md:text-7xl lg:text-8xl md:leading-tight -rotate-2 select-none">
                                     Lesson<br />Content<br />framework!
                                 </span>
 
-                                {/* Central Play Button */}
-                                <button className="absolute inset-0 m-auto w-16 h-16 md:w-20 md:h-20 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 z-10 focus:outline-none focus:ring-4 focus:ring-blue-400 focus:ring-opacity-50">
+                                {/* Play Button */}
+                                <button className="absolute inset-0 m-auto w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 z-10 focus:outline-none focus:ring-4 focus:ring-blue-400 focus:ring-opacity-50">
                                     <PlayIcon />
                                 </button>
                             </div>
 
-                            {/* AI Live Sign Overlay */}
-                            <div className="absolute bottom-16 right-4 sm:bottom-20 sm:right-6 w-32 sm:w-40 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col z-20">
-                                <div className="bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1.5">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+                            {/* AI Live Sign Overlay — smaller on mobile, repositioned */}
+                            <div className="absolute bottom-14 right-2 sm:bottom-16 sm:right-4 md:bottom-20 md:right-6 w-24 sm:w-32 md:w-40 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col z-20">
+                                <div className="bg-blue-600 text-white text-[8px] sm:text-[9px] font-bold uppercase tracking-wider px-2 py-1 flex items-center gap-1">
+                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-blue-300 animate-pulse shrink-0" />
                                     AI Live Sign
                                 </div>
                                 <div className="bg-slate-100 aspect-[4/3] relative flex items-center justify-center">
-                                    {/* Placeholder for signing avatar */}
-                                    <Image src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop" alt="AI Agent signing" fill className="object-cover object-top filter grayscale opacity-90" />
+                                    <Image
+                                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop"
+                                        alt="AI Agent signing"
+                                        fill
+                                        className="object-cover object-top filter grayscale opacity-90"
+                                    />
                                 </div>
-                                <div className="bg-slate-800 text-white flex justify-between p-1.5">
-                                    <button className="p-1 hover:text-blue-400 transition-colors" aria-label="Closed Captions for Signer"><CCIcon /></button>
-                                    <button className="p-1 hover:text-blue-400 transition-colors" aria-label="Signer Settings"><SettingsIcon /></button>
-                                    <button className="p-1 hover:text-blue-400 transition-colors" aria-label="Expand Signer"><FullscreenIcon /></button>
+                                <div className="bg-slate-800 text-white flex justify-between p-1 sm:p-1.5">
+                                    <button className="p-0.5 sm:p-1 hover:text-blue-400 transition-colors" aria-label="Closed Captions for Signer"><CCIcon /></button>
+                                    <button className="p-0.5 sm:p-1 hover:text-blue-400 transition-colors" aria-label="Signer Settings"><SettingsIcon /></button>
+                                    <button className="p-0.5 sm:p-1 hover:text-blue-400 transition-colors" aria-label="Expand Signer"><FullscreenIcon /></button>
                                 </div>
                             </div>
 
                             {/* Video Controls Bar */}
-                            <div className="bg-gradient-to-t from-slate-900 to-transparent p-4 flex items-center gap-4 text-white">
-                                <button className="hover:text-blue-400 transition-colors focus:outline-none" aria-label="Play/Pause">
+                            <div className="bg-gradient-to-t from-slate-900 to-transparent px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 md:gap-4 text-white">
+                                <button className="hover:text-blue-400 transition-colors focus:outline-none shrink-0" aria-label="Play/Pause">
                                     <PlayIcon />
                                 </button>
-                                <button className="hover:text-blue-400 transition-colors focus:outline-none" aria-label="Volume">
+                                <button className="hover:text-blue-400 transition-colors focus:outline-none hidden sm:block shrink-0" aria-label="Volume">
                                     <VolumeIcon />
                                 </button>
-                                <span className="text-xs font-semibold font-mono tracking-wide hidden sm:inline-block w-24">12:45 / 35:20</span>
 
-                                <div className="flex-1 mx-2 sm:mx-4 h-1.5 bg-white/20 rounded-full overflow-hidden cursor-pointer relative">
+                                {/* Timestamp — only on sm+ */}
+                                <span className="text-xs font-semibold font-mono tracking-wide hidden md:inline-block shrink-0 w-24">12:45 / 35:20</span>
+                                {/* Short timestamp on very small */}
+                                <span className="text-xs font-semibold font-mono tracking-wide sm:hidden shrink-0">12:45</span>
+
+                                {/* Progress bar */}
+                                <div className="flex-1 mx-1 sm:mx-2 h-1.5 bg-white/20 rounded-full overflow-visible cursor-pointer relative">
                                     <div className="absolute left-0 top-0 bottom-0 bg-blue-500 rounded-full" style={{ width: '36%' }} />
-                                    <div className="absolute left-[36%] top-1/2 -translate-y-1/2 -ml-2 w-4 h-4 bg-white rounded-full shadow-sm" />
+                                    <div className="absolute left-[36%] top-1/2 -translate-y-1/2 -ml-2 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white rounded-full shadow-sm" />
                                 </div>
-                                <span className="text-xs font-semibold font-mono tracking-wide sm:hidden">12:45</span>
 
-                                <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
                                     <button className="hover:text-blue-400 transition-colors hidden sm:block" aria-label="Captions"><CCIcon /></button>
-                                    <button className="hover:text-blue-400 transition-colors hidden sm:block" aria-label="Settings"><SettingsIcon /></button>
+                                    <button className="hover:text-blue-400 transition-colors hidden md:block" aria-label="Settings"><SettingsIcon /></button>
                                     <button className="hover:text-blue-400 transition-colors" aria-label="Fullscreen"><FullscreenIcon /></button>
                                 </div>
                             </div>
                         </div>
 
+                        {/* Mobile transcript toggle — only visible below xl */}
+                        <div className="xl:hidden">
+                            <button
+                                onClick={() => setTranscriptOpen(prev => !prev)}
+                                className="w-full flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                aria-expanded={transcriptOpen}
+                            >
+                                <span className="flex items-center gap-2">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1-19.995.324L2 12A10 10 0 0 1 12 2Z" />
+                                        <path d="M12 2v20M2.5 9h19M2.5 15h19" />
+                                    </svg>
+                                    Real-time Transcript
+                                </span>
+                                <svg
+                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                                    className={`transition-transform ${transcriptOpen ? 'rotate-180' : ''}`}
+                                >
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </button>
+
+                            {transcriptOpen && (
+                                <div className="mt-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <TranscriptContent />
+                                </div>
+                            )}
+                        </div>
+
                         {/* Video Description */}
-                        <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 md:p-6 shadow-sm">
+                            <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
                                 <FileTextIcon />
                                 Video Description
                             </h2>
-                            <div className="text-sm text-slate-600 leading-relaxed space-y-4 font-medium">
+                            <div className="text-sm text-slate-600 leading-relaxed space-y-3 sm:space-y-4 font-medium">
                                 <p>
-                                    This video segment features a split-screen presentation. On the left, a text editor displays semantic HTML code for a navigation menu. The instructor highlights the use of <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">&lt;nav&gt;</code> and <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">aria-label</code> attributes.
+                                    This video segment features a split-screen presentation. On the left, a text editor displays semantic HTML code for a navigation menu. The instructor highlights the use of{' '}
+                                    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">&lt;nav&gt;</code> and{' '}
+                                    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">aria-label</code> attributes.
                                 </p>
                                 <p>
-                                    The code shown is: <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs">&lt;nav aria-label="Main Navigation"&gt;</code>. On the right side, a visual preview of the website update is shown as the instructor types. A small circular indicator moves across the screen to pinpoint specific lines of code being discussed.
+                                    The code shown is:{' '}
+                                    <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs break-all">&lt;nav aria-label="Main Navigation"&gt;</code>. On the right side, a visual preview of the website update is shown as the instructor types.
                                 </p>
                             </div>
                         </section>
 
                         {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between mt-2">
-                            <button className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-5 rounded-xl transition-colors text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180">
+                        <div className="flex items-center justify-between gap-3">
+                            <button className="flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 sm:py-3 px-3.5 sm:px-5 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180 shrink-0">
                                     <line x1="5" y1="12" x2="19" y2="12" />
                                     <polyline points="12 5 19 12 12 19" />
                                 </svg>
-                                Previous Lesson
+                                <span className="hidden xs:inline">Previous </span>Lesson
                             </button>
-                            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2">
+                            <button className="flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2">
                                 Next Lesson
-                                <ArrowRightIcon />
+                                <ArrowRightIcon className="w-4 h-4 shrink-0" />
                             </button>
                         </div>
 
                         {/* Course Content List */}
-                        <section className="mt-2">
-                            <h2 className="text-lg font-bold text-slate-900 mb-4">Course Content</h2>
-                            <div className="space-y-3">
-                                {[
-                                    { num: 1, title: 'Introduction to ARIA', time: '10:20', status: 'completed' },
-                                    { num: 4, title: 'ARIA Patterns & Best Practices', time: 'Current', status: 'active' },
-                                    { num: 5, title: 'Testing with Screen Readers', time: '18:45', status: 'locked' },
-                                    { num: 6, title: 'Capstone: Building Accessible Forms', time: '45:00', status: 'locked' },
-                                ].map((item) => (
-                                    <div key={item.num} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-colors ${item.status === 'active' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-                                        <div className="flex items-center gap-4">
+                        <section>
+                            <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4">Course Content</h2>
+                            <div className="space-y-2 sm:space-y-3">
+                                {courseItems.map((item) => (
+                                    <div
+                                        key={item.num}
+                                        className={`flex items-center justify-between p-3.5 sm:p-4 rounded-xl border-2 transition-colors ${item.status === 'active' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
+                                    >
+                                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                                             {item.status === 'completed' ? (
                                                 <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                                 </div>
                                             ) : item.status === 'active' ? (
                                                 <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">{item.num}</div>
                                             ) : (
                                                 <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">{item.num}</div>
                                             )}
-                                            <span className={`font-bold ${item.status === 'active' ? 'text-blue-700' : item.status === 'completed' ? 'text-slate-900' : 'text-slate-500'}`}>
+                                            <span className={`font-bold text-sm sm:text-base truncate ${item.status === 'active' ? 'text-blue-700' : item.status === 'completed' ? 'text-slate-900' : 'text-slate-500'}`}>
                                                 {item.num}. {item.title}
                                             </span>
                                         </div>
-                                        <span className={`text-xs font-bold uppercase tracking-wider ${item.status === 'active' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 ml-2 ${item.status === 'active' ? 'text-blue-600' : 'text-slate-400'}`}>
                                             {item.time}
                                         </span>
                                     </div>
@@ -243,15 +299,14 @@ export default function CourseDetailPage() {
                         </section>
                     </div>
 
-                    {/* Right Column (Transcript) */}
-                    <div className="xl:w-[400px] shrink-0 flex flex-col gap-6">
-
+                    {/* ── Right Column — hidden on mobile (toggle above), shown on xl ── */}
+                    <div className="hidden xl:flex xl:w-[400px] shrink-0 flex-col gap-6">
                         {/* Real-time Transcript Card */}
                         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[600px] overflow-hidden">
-                            <header className="bg-blue-600 text-white p-5 flex items-center justify-between shrink-0">
+                            <header className="bg-blue-600 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1-19.995.324L2 12A10 10 0 0 1 12 2Z" />
                                             <path d="M12 2v20" />
                                             <path d="M2.5 9h19" />
@@ -259,73 +314,81 @@ export default function CourseDetailPage() {
                                         </svg>
                                     </div>
                                     <div>
-                                        <h2 className="font-bold text-base leading-snug">Real-time Transcript</h2>
+                                        <h2 className="font-bold text-sm sm:text-base leading-snug">Real-time Transcript</h2>
                                         <p className="text-[9px] font-bold text-blue-200 tracking-widest uppercase mt-0.5">Auto-Syncing • Multi-Language</p>
                                     </div>
                                 </div>
-                                <div className="flex gap-1.5 text-blue-200">
-                                    <button className="p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg"><DownloadIcon /></button>
-                                    <button className="p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg"><SearchIcon /></button>
+                                <div className="flex gap-1 sm:gap-1.5 text-blue-200">
+                                    <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript"><DownloadIcon /></button>
+                                    <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Search transcript"><SearchIcon /></button>
                                 </div>
                             </header>
-
-                            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm font-medium">
-                                <div className="text-slate-500 flex items-start gap-4">
-                                    <span className="font-mono font-bold text-blue-600 shrink-0">[12:15]</span>
-                                    <p className="leading-relaxed">Welcome back to Module 4. We've just covered the basic concepts of semantic markup.</p>
-                                </div>
-                                <div className="text-slate-500 flex items-start gap-4">
-                                    <span className="font-mono font-bold text-blue-600 shrink-0">[12:30]</span>
-                                    <p className="leading-relaxed">When using ARIA roles, it's essential to remember the first rule of ARIA: If you can use a native HTML element instead, do it. Native elements have built-in accessibility features.</p>
-                                </div>
-                                <div className="bg-slate-50 border-l-4 border-blue-600 -mx-6 px-6 py-4 flex items-start gap-4 shadow-inner text-slate-800 font-bold">
-                                    <span className="font-mono font-bold text-blue-700 shrink-0">[12:45]</span>
-                                    <p className="leading-relaxed">Now, let's look at how we can implement a 'live region'. A live region is an area where content updates without a page refresh, and it needs to be announced to screen reader users.</p>
-                                </div>
-                                <div className="text-slate-500 flex items-start gap-4">
-                                    <span className="font-mono font-bold text-blue-600 shrink-0">[13:02]</span>
-                                    <p className="leading-relaxed">By adding aria-live="polite", the assistive technology will wait for the user to finish their current task before announcing the change.</p>
-                                </div>
-                                <div className="text-slate-500 flex items-start gap-4">
-                                    <span className="font-mono font-bold text-blue-600 shrink-0">[13:20]</span>
-                                    <p className="leading-relaxed">Contrast this with "assertive", which interrupts immediately. Use assertive sparingly for critical errors or time-sensitive alerts.</p>
-                                </div>
-                                <div className="text-slate-400 italic flex items-center gap-2 text-xs pt-4">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                    transcribing audio...
-                                </div>
-                            </div>
+                            <TranscriptContent />
                         </section>
 
                         {/* Quick Tips */}
-                        <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl">
-                            <h3 className="font-bold text-blue-800 mb-2 flex items-center gap-2 text-sm">
-                                <LightningIcon /> Quick Tips
-                            </h3>
-                            <p className="text-xs text-blue-900/80 leading-relaxed font-medium">Click any timestamp in the transcript to jump to that moment in the video. The transcript follows the playback automatically.</p>
-                        </div>
-
+                        <QuickTips />
                     </div>
 
                 </div>
             </div>
 
-            {/* Simple Footer */}
-            <footer className="mt-12 py-8 border-t border-slate-200 text-center px-4">
-                <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex flex-wrap justify-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-wide">
+            {/* Footer */}
+            <footer className="mt-8 sm:mt-12 py-6 sm:py-8 border-t border-slate-200 px-4">
+                <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
                         <span>© 2024 Inclusive AI Learning</span>
-                        <span className="hidden md:inline">•</span>
+                        <span className="hidden sm:inline">•</span>
                         <Link href="#" className="hover:text-slate-600">Accessibility Statement</Link>
-                        <span className="hidden md:inline">•</span>
+                        <span className="hidden sm:inline">•</span>
                         <Link href="#" className="hover:text-slate-600">Privacy Policy</Link>
                     </div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
-                        <CheckCircleIcon />
+                    <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shrink-0">
+                        <CheckCircleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>WCAG 2.2 AAA Compliant</span>
                     </div>
                 </div>
             </footer>
         </DashboardLayout>
+    );
+}
+
+/* ── Shared transcript content (reused in both mobile accordion and desktop sidebar) ── */
+function TranscriptContent() {
+    return (
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 space-y-5 sm:space-y-6 text-sm font-medium">
+            {transcriptItems.map((item) =>
+                item.active ? (
+                    <div
+                        key={item.ts}
+                        className="bg-slate-50 border-l-4 border-blue-600 -mx-4 sm:-mx-5 md:-mx-6 px-4 sm:px-5 md:px-6 py-3 sm:py-4 flex items-start gap-3 sm:gap-4 shadow-inner text-slate-800 font-bold"
+                    >
+                        <span className="font-mono font-bold text-blue-700 shrink-0 text-xs sm:text-sm">[{item.ts}]</span>
+                        <p className="leading-relaxed text-xs sm:text-sm">{item.text}</p>
+                    </div>
+                ) : (
+                    <div key={item.ts} className="text-slate-500 flex items-start gap-3 sm:gap-4">
+                        <span className="font-mono font-bold text-blue-600 shrink-0 text-xs sm:text-sm">[{item.ts}]</span>
+                        <p className="leading-relaxed text-xs sm:text-sm">{item.text}</p>
+                    </div>
+                )
+            )}
+            <div className="text-slate-400 italic flex items-center gap-2 text-xs pt-3 sm:pt-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                transcribing audio...
+            </div>
+        </div>
+    );
+}
+
+/* ── Quick Tips ── */
+function QuickTips() {
+    return (
+        <div className="bg-blue-50 border border-blue-100 p-4 sm:p-5 rounded-2xl">
+            <h3 className="font-bold text-blue-800 mb-2 flex items-center gap-2 text-sm">
+                <LightningIcon /> Quick Tips
+            </h3>
+            <p className="text-xs text-blue-900/80 leading-relaxed font-medium">Click any timestamp in the transcript to jump to that moment in the video. The transcript follows the playback automatically.</p>
+        </div>
     );
 }

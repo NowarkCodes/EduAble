@@ -89,7 +89,7 @@ function Sidebar({ userInitials, userName, userTier }: { userInitials: string; u
     }
 
     return (
-        <aside className="hidden md:flex flex-col w-52 min-h-screen bg-white border-r border-slate-200 py-6 px-3 fixed left-0 top-0 z-20">
+        <aside className="hidden md:flex flex-col w-52 min-h-screen bg-white mobile-drawer-bg border-r border-slate-200 py-6 px-3 fixed left-0 top-0 z-40">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 px-3 mb-8 text-slate-900 font-extrabold text-lg tracking-tight">
                 <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white shrink-0">
@@ -145,7 +145,7 @@ function Sidebar({ userInitials, userName, userTier }: { userInitials: string; u
 /* ── Mobile top bar ──────────────────────────────── */
 function MobileTopBar({ userInitials, onMenuToggle, menuOpen }: { userInitials: string; onMenuToggle: () => void; menuOpen: boolean }) {
     return (
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white mobile-drawer-bg border-b border-slate-200 sticky top-0 z-30">
             <Link href="/" className="flex items-center gap-2 text-slate-900 font-extrabold tracking-tight">
                 <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white">
                     <LogoIcon />
@@ -184,19 +184,33 @@ function MobileDrawer({ open, onClose, userInitials, userName, userTier }: { ope
     return (
         <>
             {/* Backdrop */}
-            <div className="fixed inset-0 bg-black/30 z-40 md:hidden" onClick={onClose} aria-hidden="true" />
+            <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} aria-hidden="true" />
+
             {/* Drawer */}
-            <div className="fixed top-0 right-0 h-full w-64 bg-white z-50 md:hidden flex flex-col py-6 px-3 shadow-2xl">
-                <div className="flex items-center gap-3 px-3 mb-6 pb-4 border-b border-slate-200">
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                        {userInitials}
+            <div className="fixed top-0 right-0 h-full w-72 bg-white mobile-drawer-bg dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 z-50 md:hidden flex flex-col shadow-2xl overflow-y-auto">
+                {/* Header Section */}
+                <div className="flex items-center justify-between px-4 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 mobile-drawer-bg dark:bg-slate-950">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                            {userInitials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{userName}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userTier}</p>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{userName}</p>
-                        <p className="text-xs text-slate-500 truncate">{userTier}</p>
-                    </div>
+                    {/* Close Button Inside Drawer */}
+                    <button
+                        onClick={onClose}
+                        aria-label="Close menu"
+                        className="p-2 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 shrink-0 ml-2"
+                    >
+                        <CloseIcon />
+                    </button>
                 </div>
-                <nav className="flex flex-col gap-1 flex-1">
+
+                {/* Navigation Links */}
+                <nav className="flex flex-col gap-1 p-4 flex-1">
                     {navItems.map(({ label, icon: Icon, href }) => {
                         const active = pathname === href || pathname.startsWith(href + '/');
                         return (
@@ -205,50 +219,33 @@ function MobileDrawer({ open, onClose, userInitials, userName, userTier }: { ope
                                 href={href}
                                 onClick={onClose}
                                 aria-current={active ? 'page' : undefined}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors
-                  ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all
+                                    ${active
+                                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}`}
                             >
-                                <Icon size={16} />
+                                <Icon size={18} />
                                 {label}
                             </Link>
                         );
                     })}
                 </nav>
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-2 mt-4 rounded-lg text-sm font-semibold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-                >
-                    <LogoutIcon />
-                    Sign Out
-                </button>
+
+                {/* Footer Section (Logout) */}
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 mobile-drawer-bg dark:bg-slate-950">
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    >
+                        <LogoutIcon />
+                        Sign Out
+                    </button>
+                </div>
             </div>
         </>
     );
 }
 
-/* ── Bottom Mobile Nav ───────────────────────────── */
-function BottomNav() {
-    const pathname = usePathname();
-    return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 flex" aria-label="Mobile navigation">
-            {navItems.map(({ label, icon: Icon, href }) => {
-                const active = pathname === href || pathname.startsWith(href + '/');
-                return (
-                    <Link
-                        key={label}
-                        href={href}
-                        aria-current={active ? 'page' : undefined}
-                        className={`flex-1 flex flex-col items-center justify-center py-2.5 text-[10px] font-bold gap-1 transition-colors
-              ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-700'}`}
-                    >
-                        <Icon size={20} />
-                        {label}
-                    </Link>
-                );
-            })}
-        </nav>
-    );
-}
 
 /* ── Layout ──────────────────────────────────────── */
 interface DashboardLayoutProps {
@@ -287,11 +284,8 @@ export default function DashboardLayout({
                 userTier={userTier}
             />
 
-            {/* Bottom nav (mobile only) */}
-            <BottomNav />
-
             {/* Main content */}
-            <main className="md:ml-52 min-h-screen pb-20 md:pb-0">
+            <main className="md:ml-52 min-h-screen">
                 {children}
             </main>
         </div>

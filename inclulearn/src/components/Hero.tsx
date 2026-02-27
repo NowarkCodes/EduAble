@@ -46,7 +46,7 @@ export default function Hero() {
                             className="w-full sm:w-auto rounded-full px-8 text-base font-semibold shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
                             asChild
                         >
-                            <a href="#get-started" id="get-started" aria-label="Start learning free — no credit card required">
+                            <a href="/register" id="get-started" aria-label="Start learning free — no credit card required">
                                 Start Learning Free →
                             </a>
                         </Button>

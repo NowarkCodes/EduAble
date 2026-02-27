@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import Dropdown from '@/components/Dropdown';
 
 export default function NgoDashboard() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'video-upload' | 'video-list' | 'settings'>('dashboard');
@@ -12,6 +13,8 @@ export default function NgoDashboard() {
     totalDonations: 45231,
     activeCampaigns: 5,
   });
+
+  const [videoSubject, setVideoSubject] = useState('');
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -53,12 +56,12 @@ export default function NgoDashboard() {
     try {
       // 1. Extract Audio using FFmpeg WebAssembly (Generates tiny mp3 instead of huge wav)
       const ffmpeg = ffmpegRef.current;
-      
+
       // Add logging so you can see what FFmpeg is doing in the console
       ffmpeg.on('log', ({ message }: { message: string }) => {
         console.log('[FFmpeg]', message);
       });
-      
+
       ffmpeg.on('progress', ({ progress, time }: { progress: number, time: number }) => {
         setConversionProgress(Math.round(progress * 100));
       });
@@ -73,18 +76,18 @@ export default function NgoDashboard() {
       }
 
       setUploadStatus('Step 1: Extracting and compressing audio to MP3 locally...');
-      
+
       const inputFileName = 'input.mp4';
       const outputFileName = 'output.mp3';
 
       await ffmpeg.writeFile(inputFileName, await fetchFile(videoFile));
-      
+
       // Run the FFmpeg command: extract audio, convert to mp3 at 96kbps (more than enough for Whisper AI)
       await ffmpeg.exec(['-i', inputFileName, '-q:a', '0', '-map', 'a', outputFileName]);
-      
+
       const audioData = await ffmpeg.readFile(outputFileName) as Uint8Array;
       const audioBlob = new Blob([new Uint8Array(audioData)], { type: 'audio/mp3' });
-      
+
       // Clean up memory
       await ffmpeg.deleteFile(inputFileName);
       await ffmpeg.deleteFile(outputFileName);
@@ -94,19 +97,19 @@ export default function NgoDashboard() {
       const finalName = `${safeBaseName}.mp3`;
 
       const extractedAudio = new File([audioBlob], finalName, { type: 'audio/mp3' });
-      
+
       setAudioFile(extractedAudio);
-      
+
       // Expose the audio file for local testing via Base64 Data URI to explicitly bypass Cross-Origin Isolation blocks
       const reader = new FileReader();
       reader.onload = () => {
         setDownloadableAudio({ url: reader.result as string, name: finalName });
       };
       reader.readAsDataURL(audioBlob);
-      
+
       // 2. Request Secure Presigned Upload Links from Node.js Backend
       setUploadStatus(`Step 2: Requesting secure Google Cloud upload links for ${videoFile.name}...`);
-      
+
       const presignedRes = await fetch('http://localhost:5000/api/ngo/upload-urls', {
         method: 'POST',
         headers: {
@@ -125,10 +128,10 @@ export default function NgoDashboard() {
       }
 
       const { videoUrl, audioUrl, cloudVideoName, cloudAudioName } = await presignedRes.json();
-      
+
       // 3. Direct Dual-Stream Upload to Google Cloud Storage
       setUploadStatus(`Step 3: Direct Cloud Uploading (Bypassing Server)... Sending Video (${(videoFile.size / 1024 / 1024).toFixed(2)} MB) & Compressed Audio (${(extractedAudio.size / 1024 / 1024).toFixed(2)} MB) in parallel to GCS.`);
-      
+
       // Upload both explicitly to their respective Google Cloud buckets at the same time
       const [videoUploadRes, audioUploadRes] = await Promise.all([
         fetch(videoUrl, {
@@ -146,7 +149,7 @@ export default function NgoDashboard() {
       if (!videoUploadRes.ok || !audioUploadRes.ok) {
         throw new Error('Failed to stream files to Google Cloud Storage. Ensure bucket has CORS enabled.');
       }
-      
+
       // 4. Success Trigger
       setUploadStatus(`✅ Upload Complete! S3/GCS Event triggered the AI Whisper model on the lightweight audio track.`);
       setIsUploadSuccess(true);
@@ -178,8 +181,8 @@ export default function NgoDashboard() {
         .then(data => {
           if (data.videos) {
             // Sort videos by updated date descending
-            const sorted = data.videos.sort((a: any, b: any) => 
-               new Date(b.updated).getTime() - new Date(a.updated).getTime()
+            const sorted = data.videos.sort((a: any, b: any) =>
+              new Date(b.updated).getTime() - new Date(a.updated).getTime()
             );
             setCloudVideos(sorted);
           }
@@ -199,11 +202,10 @@ export default function NgoDashboard() {
         <nav className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible no-scrollbar pb-2 lg:pb-0">
           <a
             href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'dashboard'
+            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'dashboard'
                 ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
                 : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
+              }`}
             onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}
             aria-current={activeTab === 'dashboard' ? 'page' : undefined}
           >
@@ -211,11 +213,10 @@ export default function NgoDashboard() {
           </a>
           <a
             href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'video-upload'
+            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'video-upload'
                 ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
                 : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
+              }`}
             onClick={(e) => { e.preventDefault(); setActiveTab('video-upload'); }}
             aria-current={activeTab === 'video-upload' ? 'page' : undefined}
           >
@@ -223,11 +224,10 @@ export default function NgoDashboard() {
           </a>
           <a
             href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'video-list'
+            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'video-list'
                 ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
                 : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
+              }`}
             onClick={(e) => { e.preventDefault(); setActiveTab('video-list'); }}
             aria-current={activeTab === 'video-list' ? 'page' : undefined}
           >
@@ -235,11 +235,10 @@ export default function NgoDashboard() {
           </a>
           <a
             href="#"
-            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${
-              activeTab === 'settings'
+            className={`whitespace-nowrap lg:whitespace-normal p-4 rounded-xl no-underline font-semibold transition-all duration-300 flex items-center gap-3 ${activeTab === 'settings'
                 ? 'bg-[#1a56db] text-white shadow-[0_4px_12px_rgba(26,86,219,0.2)]'
                 : 'text-[#a3aed1] hover:bg-[#f4f7fe] hover:text-[#1a56db] hover:translate-x-1 lg:hover:translate-x-1 hover:-translate-y-1 lg:hover:-translate-y-0'
-            }`}
+              }`}
             onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}
             aria-current={activeTab === 'settings' ? 'page' : undefined}
           >
@@ -389,18 +388,20 @@ export default function NgoDashboard() {
 
                   <div className="flex flex-col gap-2">
                     <label htmlFor="video-subject" className="font-semibold text-[#2b3674] text-sm">Subject / Category</label>
-                    <select
+                    <Dropdown
                       id="video-subject"
-                      required
-                      className="p-4 rounded-xl border border-[#e0e5f2] bg-[#f4f7fe] font-sans text-base text-[#2b3674] outline-none transition-all duration-200 focus:border-[#1a56db] focus:ring-[3px] focus:ring-[#1a56db]/10 focus:bg-white"
-                    >
-                      <option value="">Select a category...</option>
-                      <option value="math">Mathematics</option>
-                      <option value="science">Sciences</option>
-                      <option value="language">Languages</option>
-                      <option value="life-skills">Life Skills</option>
-                      <option value="other">Other</option>
-                    </select>
+                      value={videoSubject}
+                      onChange={setVideoSubject}
+                      placeholder="Select a category..."
+                      options={[
+                        { label: 'Mathematics', value: 'math' },
+                        { label: 'Sciences', value: 'science' },
+                        { label: 'Languages', value: 'language' },
+                        { label: 'Life Skills', value: 'life-skills' },
+                        { label: 'Other', value: 'other' }
+                      ]}
+                      className="w-full text-base font-sans"
+                    />
                   </div>
 
                   <div className="flex flex-col gap-2">
@@ -416,12 +417,12 @@ export default function NgoDashboard() {
 
                   <div className="flex flex-col gap-2">
                     <label className="font-semibold text-[#2b3674] text-sm">Video File (MP4, WebM)</label>
-                    <input 
-                      type="file" 
-                      accept="video/mp4,video/webm" 
-                      className="hidden" 
-                      ref={fileInputRef} 
-                      onChange={handleFileSelect} 
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
                     />
                     <div
                       className={`border-2 border-dashed ${videoFile ? 'border-[#05cd99] bg-[#05cd99]/[0.03]' : 'border-[#1a56db] bg-[#1a56db]/[0.03]'} rounded-2xl p-8 lg:p-12 text-center cursor-pointer transition-all duration-200 hover:bg-[#1a56db]/[0.06] hover:-translate-y-0.5`}
@@ -457,7 +458,7 @@ export default function NgoDashboard() {
                   {uploadStatus && (
                     <div className={`p-4 rounded-xl text-sm font-semibold border relative overflow-hidden ${uploadStatus.includes('✅') ? 'bg-[#f0fdf4] text-[#16a34a] border-[#bbf7d0]' : uploadStatus.includes('❌') ? 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca]' : 'bg-[#e0e7ff] text-[#4f46e5] border-[#c7d2fe]'}`}>
                       {conversionProgress > 0 && conversionProgress < 100 && (
-                        <div 
+                        <div
                           className="absolute top-0 left-0 h-full bg-[#1a56db]/10 transition-all duration-300"
                           style={{ width: `${conversionProgress}%` }}
                         />
@@ -485,7 +486,7 @@ export default function NgoDashboard() {
                     <p className="text-[#2b3674] mb-6 text-sm">
                       The audio track was successfully extracted and compressed into a small <code className="bg-white px-2 py-1 rounded text-[#16a34a] font-bold">.mp3</code> completely inside your browser using FFmpeg WebAssembly. No server compute was used!
                     </p>
-                    <button 
+                    <button
                       onClick={() => {
                         const a = document.createElement('a');
                         a.href = downloadableAudio.url;
@@ -512,11 +513,11 @@ export default function NgoDashboard() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center">
                   {downloadableAudio && (
-                    <button 
+                    <button
                       onClick={() => {
                         const a = document.createElement('a');
                         a.href = downloadableAudio.url;
-                        a.download = downloadableAudio.name; 
+                        a.download = downloadableAudio.name;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
@@ -526,7 +527,7 @@ export default function NgoDashboard() {
                       🎵 Download Generated MP3
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={() => {
                       setIsUploadSuccess(false);
                       setVideoFile(null);
@@ -559,7 +560,7 @@ export default function NgoDashboard() {
                   Manage all the videos successfully processed and uploaded to the cloud.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setActiveTab('video-upload')}
                 className="bg-[#1a56db] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1a56db]/90 cursor-pointer border-none transition-transform hover:-translate-y-0.5"
               >
@@ -577,7 +578,7 @@ export default function NgoDashboard() {
                 <span className="text-5xl mb-4 opacity-50">📂</span>
                 <p className="text-[#a3aed1] font-medium text-lg mb-2">No videos found</p>
                 <p className="text-[#a3aed1] text-sm mb-6 max-w-sm">Upload your first inclusive educational video to see it appear in the library.</p>
-                <button 
+                <button
                   onClick={() => setActiveTab('video-upload')}
                   className="bg-[#f4f7fe] text-[#1a56db] border-none font-semibold px-6 py-3 rounded-xl cursor-pointer hover:bg-[#e4ebfc] transition-colors"
                 >
@@ -595,10 +596,10 @@ export default function NgoDashboard() {
                     parts.shift(); // Remove the timestamp portion prefix
                     displayTitle = parts.join('-');
                   }
-                  
+
                   // Format size properly (Bytes to MB)
                   const sizeMB = video.size ? (parseInt(video.size) / 1024 / 1024).toFixed(2) : '0.00';
-                  
+
                   // Format date properly
                   const uploadDate = video.updated ? new Date(video.updated).toLocaleDateString(undefined, {
                     month: 'short', day: 'numeric', year: 'numeric'
@@ -620,7 +621,7 @@ export default function NgoDashboard() {
                           <span className="flex items-center gap-1">⏱️ {uploadDate}</span>
                           <span className="flex items-center gap-1">💾 {sizeMB} MB</span>
                         </div>
-                        
+
                         <div className="mt-auto space-y-2">
                           <div className="flex items-center gap-2 text-xs font-semibold text-[#05cd99] bg-[#05cd99]/10 py-1.5 px-3 rounded-md w-fit">
                             <span>✓</span> Captions Ready

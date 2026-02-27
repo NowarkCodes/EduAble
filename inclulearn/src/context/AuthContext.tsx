@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = () => {
         localStorage.removeItem('EduAble_token');
         localStorage.removeItem('EduAble_user');
+        document.cookie = 'EduAble_token=; path=/; max-age=0; SameSite=Lax;';
         setUser(null);
         setToken(null);
     };

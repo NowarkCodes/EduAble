@@ -3,6 +3,9 @@
 import React, { useState, Fragment } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
+import { useAccessibility } from '@/context/AccessibilityContext';
+import { ChevronDown, Eye, PlayCircle } from 'lucide-react';
+import Dropdown from '@/components/Dropdown';
 
 /* ── Types ───────────────────────────────────────── */
 type SettingsTab = 'accessibility' | 'visual' | 'audio' | 'shortcuts';
@@ -19,9 +22,9 @@ interface ToggleProps {
 /* ── Toggle Card ─────────────────────────────────── */
 function ToggleCard({ id, checked, onChange, label, description, badge }: ToggleProps) {
     return (
-        <div className="flex items-start justify-between gap-4 p-5 bg-white rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
+        <div className="flex items-start justify-between gap-3 p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
             <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
                     <label htmlFor={id} className="text-sm font-bold text-slate-900 cursor-pointer">{label}</label>
                     {badge && (
                         <span className="text-[9px] font-bold uppercase tracking-widest bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{badge}</span>
@@ -34,7 +37,7 @@ function ToggleCard({ id, checked, onChange, label, description, badge }: Toggle
                 role="switch"
                 aria-checked={checked}
                 onClick={() => onChange(!checked)}
-                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 mt-0.5 ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
             >
                 <span
                     className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform mt-0.5 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`}
@@ -48,7 +51,7 @@ function ToggleCard({ id, checked, onChange, label, description, badge }: Toggle
 /* ── Section heading ─────────────────────────────── */
 function SectionHeading({ id, icon, title }: { id?: string; icon: React.ReactNode; title: string }) {
     return (
-        <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-900 mb-4">
+        <h2 id={id} className="flex items-center gap-2 text-base font-extrabold text-slate-900 mb-4">
             <span className="text-blue-600">{icon}</span>
             {title}
         </h2>
@@ -87,138 +90,459 @@ const shortcuts = [
 /* ── Page ────────────────────────────────────────── */
 export default function SettingsPage() {
     const { user: authUser } = useAuth();
-    const initials = (authUser?.name ?? 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const initials = (authUser?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
 
     const [activeTab, setActiveTab] = useState<SettingsTab>('accessibility');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
-
-    // General
     const [language, setLanguage] = useState('English (US)');
 
-    // Visual
-    const [dyslexiaFont, setDyslexiaFont] = useState(false);
-    const [reducedMotion, setReducedMotion] = useState(false);
-    const [highContrast, setHighContrast] = useState(false);
-    const [textScale, setTextScale] = useState(125);
-
-    // Audio
-    const [voiceSpeed, setVoiceSpeed] = useState(1.2);
-    const [screenReader, setScreenReader] = useState(true);
-    const [soundEffects, setSoundEffects] = useState(true);
+    const {
+        dyslexiaFont, setDyslexiaFont,
+        reducedMotion, setReducedMotion,
+        highContrast, setHighContrast,
+        textScale, setTextScale,
+        blinkitTheme, setBlinkitTheme,
+        voiceSpeed, setVoiceSpeed,
+        screenReader, setScreenReader,
+        soundEffects, setSoundEffects,
+        captionTextSize, setCaptionTextSize,
+        captionTextColor, setCaptionTextColor,
+        captionBgOpacity, setCaptionBgOpacity,
+        captionFontFamily, setCaptionFontFamily,
+        applyScreenReaderOptimized,
+        applyHighContrastMode,
+        applyReducedMotion,
+        applyLargeText,
+        resetToDefault
+    } = useAccessibility();
 
     function handleSave() {
         setSaving(true);
         setTimeout(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000); }, 800);
     }
+
     function handleReset() {
-        setDyslexiaFont(false); setReducedMotion(false); setHighContrast(false);
-        setTextScale(125); setVoiceSpeed(1.2); setScreenReader(true); setSoundEffects(true);
+        resetToDefault();
         setLanguage('English (US)');
     }
 
     return (
         <DashboardLayout userInitials={initials} userName={authUser?.name ?? 'User'} userTier="Standard Account">
-            <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8">
+            <div className="max-w-screen-2xl w-full mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-8 lg:py-10">
+
                 {/* Breadcrumb */}
-                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-500 mb-4">
+                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-500 mb-5 sm:mb-6 font-medium">
                     <span>Home</span>
                     <span aria-hidden="true">›</span>
-                    <span className="text-slate-900 font-semibold">Settings</span>
+                    <span className="text-slate-900 font-bold">Settings</span>
                 </nav>
 
-                <div className="mb-7">
-                    <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-1">Platform Settings</h1>
-                    <p className="text-slate-500 text-sm">Manage your profile, language, and universal accessibility preferences.</p>
+                {/* Page title */}
+                <div className="mb-6 sm:mb-8 lg:mb-10 w-full min-w-0">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight mb-2 sm:mb-3">Platform Settings</h1>
+                    <p className="text-slate-500 text-sm sm:text-base max-w-2xl">Manage your profile, language, and universal accessibility preferences.</p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-6">
-                    {/* Left tab rail */}
-                    <nav aria-label="Settings sections" className="flex sm:flex-col gap-1 sm:w-44 shrink-0 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
+                <div className="flex flex-col lg:flex-row gap-6 xl:gap-12 w-full">
+
+                    {/* ── Tab Rail ───────────────────────────────────── */}
+                    {/* 
+                        Mobile: horizontal scrollable pill row
+                        Tablet+: horizontal with wrapping
+                        Desktop (lg+): vertical sidebar
+                    */}
+                    <nav
+                        aria-label="Settings sections"
+                        className="
+                            flex flex-row lg:flex-col
+                            gap-1.5 sm:gap-2
+                            w-full lg:w-56 xl:w-64
+                            shrink-0
+                            overflow-x-auto lg:overflow-visible
+                            pb-3 lg:pb-0
+                            border-b lg:border-b-0 lg:border-r
+                            border-slate-200
+                            lg:pr-6 xl:pr-8
+                            -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0
+                            scrollbar-none
+                        "
+                        style={{ WebkitOverflowScrolling: 'touch' }}
+                    >
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 aria-current={activeTab === tab.id ? 'true' : undefined}
-                                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors text-left
-                  ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                                className={`
+                                    flex items-center gap-2.5
+                                    px-3 sm:px-4 py-2.5 sm:py-3
+                                    rounded-xl
+                                    text-xs sm:text-sm font-bold
+                                    whitespace-nowrap
+                                    transition-all
+                                    text-left
+                                    flex-shrink-0
+                                    lg:w-full
+                                    ${activeTab === tab.id
+                                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 lg:bg-transparent'
+                                    }
+                                `}
                             >
-                                {tab.icon}
-                                {tab.label}
+                                <span className="shrink-0">{tab.icon}</span>
+                                <span>{tab.label}</span>
                             </button>
                         ))}
                     </nav>
 
-                    {/* Content area */}
-                    <div className="flex-1 min-w-0 space-y-6">
+                    {/* ── Content area ───────────────────────────────── */}
+                    <div className="flex-1 min-w-0 space-y-6 sm:space-y-8 lg:space-y-10 w-full">
 
                         {/* General Preferences — always show */}
                         <section aria-labelledby="general-heading">
-                            <SectionHeading id="general-heading"
+                            <SectionHeading
+                                id="general-heading"
                                 icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="8" r="5" /><path d="M3.5 8h9M8 3c-1.5 2-1.5 6 0 10M8 3c1.5 2 1.5 6 0 10" /></svg>}
                                 title="General Preferences"
                             />
-                            <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5">
                                 <label htmlFor="language-select" className="text-sm font-bold text-slate-900 block mb-1">Preferred Language</label>
                                 <p className="text-xs text-slate-500 mb-3">Choose your primary language for the platform interface and AI tutoring.</p>
-                                <select
+                                <Dropdown
                                     id="language-select"
                                     value={language}
-                                    onChange={e => setLanguage(e.target.value)}
-                                    className="w-full sm:w-48 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                >
-                                    {['English (US)', 'English (UK)', 'Hindi', 'Spanish', 'French', 'German', 'Arabic'].map(l => (
-                                        <option key={l}>{l}</option>
-                                    ))}
-                                </select>
+                                    onChange={setLanguage}
+                                    options={['English (US)', 'English (UK)', 'Hindi', 'Spanish', 'French', 'German', 'Arabic']}
+                                    className="w-full sm:w-48"
+                                />
                             </div>
                         </section>
 
-                        {/* Accessibility tab */}
+                        {/* ── Accessibility tab ──────────────────────── */}
                         {activeTab === 'accessibility' && (
-                            <section aria-labelledby="a11y-heading">
-                                <SectionHeading id="a11y-heading"
+                            <section aria-labelledby="a11y-heading" className="space-y-6 sm:space-y-8 w-full">
+                                <SectionHeading
+                                    id="a11y-heading"
                                     icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="2.5" r="1.5" fill="currentColor" stroke="none" /><path d="M4 5.5h8M8 6.5V14M5.5 14l2.5-3 2.5 3" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                                     title="Accessibility Settings"
                                 />
-                                <div className="space-y-3">
-                                    <ToggleCard id="screen-reader" checked={screenReader} onChange={setScreenReader} label="Screen Reader Optimization" description="Enhances ARIA labels and focus management for screen reader users." badge="WCAG 2.2 AA" />
-                                    <ToggleCard id="sound-effects" checked={soundEffects} onChange={setSoundEffects} label="UI Sound Effects" description="Plays subtle audio cues when interacting with buttons and completing tasks." />
+
+                                {/* Live Preview Banner */}
+                                <div className="bg-[#040d21] rounded-2xl overflow-hidden border border-[#00e5ff]/50 p-5 sm:p-6 md:p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 lg:gap-10 xl:gap-12 w-full shadow-2xl">
+                                    {/* Left copy */}
+                                    <div className="flex-1 min-w-0 w-full flex flex-col justify-center">
+                                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+                                            <span className="text-[#00e5ff] text-xs sm:text-sm font-black uppercase tracking-[0.16em]">LIVE PREVIEW</span>
+                                            <span className="bg-[#00e5ff] text-[#040d21] text-[10px] font-black px-2 py-0.5 rounded-[4px] tracking-wide leading-none">HQ</span>
+                                        </div>
+                                        <h3 className="text-[#00e5ff] text-3xl sm:text-4xl lg:text-5xl xl:text-[56px] font-black leading-[1.05] tracking-tight mb-4 sm:mb-5">
+                                            This is how high-contrast text looks.
+                                        </h3>
+                                        <p className="text-white text-sm sm:text-base lg:text-lg xl:text-[20px] font-medium leading-relaxed max-w-lg">
+                                            Secondary information appears in white for clear hierarchy.
+                                        </p>
+                                    </div>
+
+                                    {/* Right card */}
+                                    <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 flex flex-col gap-3 sm:gap-4 justify-center">
+                                        <div className="bg-[#06132d] shadow-xl rounded-2xl p-5 sm:p-6 border border-[#00e5ff]/20">
+                                            <p className="text-[#00e5ff] text-sm sm:text-base italic font-medium mb-4 leading-relaxed">
+                                                "Machine learning is the study of computer algorithms that improve automatically through experience."
+                                            </p>
+                                            <p className="text-[#00b8cc] text-sm font-bold tracking-wide">— Accessible AI Assistant</p>
+                                        </div>
+                                        <button className="bg-[#00e5ff] text-[#040d21] border-2 border-[#00e5ff] font-black uppercase tracking-[0.15em] text-sm px-6 py-3.5 rounded-xl w-full hover:bg-cyan-300 transition-colors shadow-lg shadow-[#00e5ff]/20 min-h-[3rem]">
+                                            SAMPLE BUTTON
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Setting modules */}
+                                <div className="space-y-6 sm:space-y-8 w-full">
+
+                                    {/* Visual Preferences */}
+                                    <div className="bg-white rounded-[16px] border border-slate-200 overflow-hidden shadow-sm w-full">
+                                        <div className="p-5 sm:p-6 md:p-8">
+                                            <div className="flex items-center gap-3 mb-6 sm:mb-7">
+                                                <div className="text-blue-600 bg-white shadow-sm p-2 rounded-full border border-slate-100 flex items-center justify-center shrink-0">
+                                                    <Eye className="w-5 h-5" strokeWidth={2.5} />
+                                                </div>
+                                                <h2 className="text-base sm:text-lg lg:text-xl font-black tracking-wide text-slate-900">Visual Preferences</h2>
+                                            </div>
+
+                                            {/* Font Scaling */}
+                                            <div className="mb-6 sm:mb-8">
+                                                <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
+                                                    <label className="text-sm sm:text-base font-bold text-slate-900 tracking-wide">Font Scaling</label>
+                                                    <span className="bg-sky-50 text-sky-700 text-xs font-black px-3 py-1.5 rounded-full tracking-wider">
+                                                        {textScale}%
+                                                    </span>
+                                                </div>
+                                                <div className="relative mb-2">
+                                                    <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-slate-100 -translate-y-1/2 rounded-full"></div>
+                                                    <input
+                                                        type="range"
+                                                        min={100}
+                                                        max={200}
+                                                        step={5}
+                                                        value={textScale}
+                                                        onChange={(e) => setTextScale(Number(e.target.value))}
+                                                        className="w-full relative z-10 appearance-none bg-transparent accent-blue-600 h-2 cursor-pointer"
+                                                    />
+                                                </div>
+                                                <div className="flex justify-between text-xs font-black text-slate-400 mt-2 tracking-wider">
+                                                    <span>100%</span>
+                                                    <span>150%</span>
+                                                    <span>200%</span>
+                                                </div>
+                                                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-3">Increases text size throughout the platform for better readability.</p>
+                                            </div>
+
+                                            {/* Reduced Motion */}
+                                            <div className="p-4 sm:p-5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between mb-3 gap-4">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-sm sm:text-base font-bold tracking-wide text-slate-900 mb-1">Reduced Motion</div>
+                                                    <div className="text-xs sm:text-sm text-slate-500 font-medium leading-tight">Minimizes animations and decorative transitions.</div>
+                                                </div>
+                                                <button
+                                                    role="switch"
+                                                    aria-checked={reducedMotion}
+                                                    onClick={() => setReducedMotion(!reducedMotion)}
+                                                    className={`relative inline-flex h-7 w-12 sm:h-8 sm:w-14 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 ${reducedMotion ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                                >
+                                                    <span className={`inline-block h-6 w-6 sm:h-7 sm:w-7 transform rounded-full bg-white shadow-sm transition-transform mt-0.5 ${reducedMotion ? 'translate-x-[22px] sm:translate-x-[26px]' : 'translate-x-0.5 sm:translate-x-[2px]'}`} />
+                                                    <span className="sr-only">Reduced Motion</span>
+                                                </button>
+                                            </div>
+
+                                            {/* High Contrast */}
+                                            <div className="p-4 sm:p-5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-4">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                        <div className="text-sm sm:text-base font-bold tracking-wide text-slate-900">High Contrast Mode</div>
+                                                        <span className="text-[0.625rem] font-bold uppercase tracking-widest bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">WCAG 2.2 AAA</span>
+                                                    </div>
+                                                    <div className="text-xs sm:text-sm text-slate-500 font-medium leading-tight">Forces a Deep Navy &amp; Neon Cyan color scheme.</div>
+                                                </div>
+                                                <button
+                                                    role="switch"
+                                                    aria-checked={highContrast}
+                                                    onClick={() => setHighContrast(!highContrast)}
+                                                    className={`relative inline-flex h-7 w-12 sm:h-8 sm:w-14 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 ${highContrast ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                                >
+                                                    <span className={`inline-block h-6 w-6 sm:h-7 sm:w-7 transform rounded-full bg-white shadow-sm transition-transform mt-0.5 ${highContrast ? 'translate-x-[22px] sm:translate-x-[26px]' : 'translate-x-0.5 sm:translate-x-[2px]'}`} />
+                                                    <span className="sr-only">High Contrast Mode</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Voice Synthesis */}
+                                    <div className="bg-white rounded-[16px] border border-slate-200 overflow-hidden shadow-sm">
+                                        <div className="p-5 sm:p-6 md:p-8">
+                                            <div className="flex items-center gap-3 mb-5 sm:mb-6">
+                                                <div className="text-blue-600 shrink-0">
+                                                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <circle cx="12" cy="12" r="9" />
+                                                        <path d="M12 8a4 4 0 1 1-4 4 4 4 0 0 1 4-4zm6 9a7 7 0 0 0 0-10" />
+                                                    </svg>
+                                                </div>
+                                                <h2 className="text-base sm:text-lg lg:text-xl font-black tracking-wide text-slate-900">Voice Synthesis</h2>
+                                            </div>
+
+                                            <div className="mb-6 sm:mb-8">
+                                                <div className="flex items-center justify-between mb-3 gap-2">
+                                                    <label className="text-sm sm:text-base font-bold text-slate-900 tracking-wide">Speech Rate</label>
+                                                    <span className="text-sm font-bold text-slate-600 font-mono tracking-wider bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                                                        {voiceSpeed.toFixed(2)}x
+                                                    </span>
+                                                </div>
+                                                <div className="relative mb-2">
+                                                    <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-slate-100 -translate-y-1/2 rounded-full"></div>
+                                                    <input
+                                                        type="range"
+                                                        min={0.5}
+                                                        max={2.5}
+                                                        step={0.1}
+                                                        value={voiceSpeed}
+                                                        onChange={(e) => setVoiceSpeed(Number(e.target.value))}
+                                                        className="w-full relative z-10 appearance-none bg-transparent accent-blue-600 h-2 cursor-pointer"
+                                                    />
+                                                </div>
+                                                <div className="flex justify-between text-xs text-slate-400 font-medium mt-1">
+                                                    <span>0.5x Slow</span>
+                                                    <span>2.5x Fast</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Test Voice + Select */}
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                <button className="flex items-center justify-center gap-2 sm:w-auto px-5 py-3 rounded-xl border-2 border-blue-600 text-blue-600 font-bold text-sm bg-white hover:bg-blue-50 transition-colors focus:ring-2 focus:ring-blue-600 focus:outline-none min-h-[3rem] shrink-0">
+                                                    <PlayCircle className="w-5 h-5" strokeWidth={2.5} />
+                                                    Test Voice
+                                                </button>
+                                                <div className="relative flex-1 min-w-0">
+                                                    <Dropdown
+                                                        value="AI Assistant (Female)"
+                                                        onChange={() => { }}
+                                                        options={['AI Assistant (Female)', 'AI Assistant (Male)']}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Caption Customization */}
+                                    <div className="bg-white rounded-[16px] border border-slate-200 overflow-hidden shadow-sm">
+                                        <div className="p-5 sm:p-6 md:p-8">
+                                            <div className="flex items-center gap-3 mb-5 sm:mb-6">
+                                                <div className="text-white bg-blue-600 rounded-md p-1 px-1.5 flex justify-center items-center shrink-0">
+                                                    <span className="text-xs font-black leading-none">CC</span>
+                                                </div>
+                                                <h2 className="text-base sm:text-lg lg:text-xl font-black tracking-wide text-slate-900">Caption Customization</h2>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
+                                                {/* Text Size */}
+                                                <div className="min-w-0">
+                                                    <label className="text-sm font-black text-slate-900 block mb-2 tracking-wide">Text Size</label>
+                                                    <div className="relative">
+                                                        <Dropdown
+                                                            value={captionTextSize}
+                                                            onChange={setCaptionTextSize}
+                                                            options={['Small', 'Medium', 'Large', 'X-Large']}
+                                                            className="w-full"
+                                                            style={{
+                                                                fontSize:
+                                                                    captionTextSize === 'Small' ? '0.875rem' :
+                                                                        captionTextSize === 'Medium' ? '1rem' :
+                                                                            captionTextSize === 'Large' ? '1.125rem' : '1.25rem'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Text Color */}
+                                                <div className="min-w-0">
+                                                    <label className="text-sm font-black text-slate-900 block mb-2 tracking-wide">Text Color</label>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        {[
+                                                            { value: 'White', bg: 'bg-white', ring: 'ring-slate-400', border: 'border border-slate-300', label: 'White text' },
+                                                            { value: 'Yellow', bg: 'bg-[#EAB308]', ring: 'ring-yellow-400', border: '', label: 'Yellow text' },
+                                                            { value: 'Green', bg: 'bg-[#4ADE80]', ring: 'ring-green-400', border: '', label: 'Green text' },
+                                                            { value: 'Cyan', bg: 'bg-[#22D3EE]', ring: 'ring-cyan-400', border: '', label: 'Cyan text' },
+                                                        ].map(({ value, bg, ring, border, label }) => (
+                                                            <button
+                                                                key={value}
+                                                                onClick={() => setCaptionTextColor(value)}
+                                                                aria-label={label}
+                                                                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${bg} ${border} transition-all focus:outline-none focus:ring-2 ${ring} focus:ring-offset-2 shrink-0 ${captionTextColor === value ? 'ring-[3px] ring-blue-600 ring-offset-2' : ''}`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Background Opacity */}
+                                                <div className="min-w-0">
+                                                    <label className="text-sm font-black text-slate-900 block mb-2 tracking-wide">Background Opacity</label>
+                                                    <div className="relative">
+                                                        <Dropdown
+                                                            value={captionBgOpacity}
+                                                            onChange={setCaptionBgOpacity}
+                                                            options={['50%', '75%', '100%']}
+                                                            className="w-full"
+                                                            style={{
+                                                                opacity: captionBgOpacity === '50%' ? 0.5 :
+                                                                    captionBgOpacity === '75%' ? 0.75 : 1
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Font Family */}
+                                                <div className="min-w-0">
+                                                    <label className="text-sm font-black text-slate-900 block mb-2 tracking-wide">Font Family</label>
+                                                    <div className="relative">
+                                                        <Dropdown
+                                                            value={captionFontFamily}
+                                                            onChange={setCaptionFontFamily}
+                                                            options={['Sans Serif', 'OpenDyslexic']}
+                                                            className="w-full"
+                                                            style={{
+                                                                fontFamily: captionFontFamily === 'OpenDyslexic' ? "'OpenDyslexic', sans-serif" : "sans-serif"
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
                         )}
 
-                        {/* Visual tab */}
+                        {/* ── Visual tab ─────────────────────────────── */}
                         {activeTab === 'visual' && (
                             <section aria-labelledby="visual-heading">
-                                <SectionHeading id="visual-heading"
+                                <SectionHeading
+                                    id="visual-heading"
                                     icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.5" /><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" strokeLinecap="round" /></svg>}
                                     title="Visual Accessibility"
                                 />
                                 <div className="space-y-3">
                                     <ToggleCard id="dyslexia-font" checked={dyslexiaFont} onChange={setDyslexiaFont} label="Dyslexia Friendly Font" description="Switches the typeface to one specifically designed for easier reading." />
-                                    <ToggleCard id="reduced-motion" checked={reducedMotion} onChange={setReducedMotion} label="Reduced Motion" description="Stops all non-essential transitions and animations to prevent vestibular triggers." />
-                                    <div className="relative">
-                                        <ToggleCard id="high-contrast" checked={highContrast} onChange={setHighContrast} label="High Contrast Mode" description="Forces a Black and Yellow color scheme for maximum contrast." badge="WCAG 2.2 AAA" />
-                                    </div>
+                                    <ToggleCard id="reduced-motion-v" checked={reducedMotion} onChange={setReducedMotion} label="Reduced Motion" description="Stops all non-essential transitions and animations to prevent vestibular triggers." />
+                                    <ToggleCard id="high-contrast-v" checked={highContrast} onChange={setHighContrast} label="High Contrast Mode" description="Forces a Deep Navy & Neon Cyan color scheme for maximum contrast." badge="WCAG 2.2 AAA" />
 
-                                    {/* High contrast preview */}
                                     {highContrast && (
-                                        <div className="rounded-2xl bg-black border-2 border-yellow-400 p-5">
-                                            <p className="text-yellow-400 font-extrabold text-sm mb-2">High Contrast Preview</p>
-                                            <p className="text-yellow-300 text-xs mb-4">Ensures a 21:1 contrast ratio with yellow text on a black background.</p>
-                                            <button className="px-4 py-2 bg-yellow-400 text-black text-xs font-black rounded-lg">Sample Button</button>
+                                        <div className="rounded-2xl bg-[#040d21] border-2 border-[#00e5ff] p-4 sm:p-5">
+                                            <p className="text-[#00e5ff] font-extrabold text-sm mb-2">High Contrast Preview</p>
+                                            <p className="text-[#00b8cc] text-xs mb-4">Ensures a high contrast ratio with bright cyan text on a deep navy background.</p>
+                                            <button className="px-4 py-2.5 bg-[#00e5ff] border-2 border-[#00e5ff] text-[#040d21] text-xs font-black rounded-lg">Sample Button</button>
                                         </div>
                                     )}
 
-                                    {/* Text scale slider */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5">
+                                        <label htmlFor="theme-select" className="text-sm font-bold text-slate-900 block mb-1">Global Theme Profile</label>
+                                        <p className="text-xs text-slate-500 mb-3">Manually apply a specialized accessibility color profile across the entire platform.</p>
+                                        <Dropdown
+                                            id="theme-select"
+                                            value={
+                                                blinkitTheme === 'theme-blinkit-high-contrast' ? 'High Contrast Theme (Blind)' :
+                                                    blinkitTheme === 'theme-blinkit-deaf' ? 'Visual Pulse Mode (Deaf/HoH)' :
+                                                        blinkitTheme === 'theme-blinkit-cognitive' ? 'Calm Learning Mode (Cognitive)' :
+                                                            blinkitTheme === 'theme-blinkit-motor' ? 'EasyReach Mode (Motor)' :
+                                                                blinkitTheme === 'theme-blinkit-colorblind' ? 'Pattern Vision Mode (Color Blind)' : 'Default Theme'
+                                            }
+                                            onChange={(val) => {
+                                                if (val === 'High Contrast Theme (Blind)') setBlinkitTheme('theme-blinkit-high-contrast');
+                                                else if (val === 'Visual Pulse Mode (Deaf/HoH)') setBlinkitTheme('theme-blinkit-deaf');
+                                                else if (val === 'Calm Learning Mode (Cognitive)') setBlinkitTheme('theme-blinkit-cognitive');
+                                                else if (val === 'EasyReach Mode (Motor)') setBlinkitTheme('theme-blinkit-motor');
+                                                else if (val === 'Pattern Vision Mode (Color Blind)') setBlinkitTheme('theme-blinkit-colorblind');
+                                                else setBlinkitTheme('');
+                                            }}
+                                            options={[
+                                                'Default Theme',
+                                                'High Contrast Theme (Blind)',
+                                                'Visual Pulse Mode (Deaf/HoH)',
+                                                'Calm Learning Mode (Cognitive)',
+                                                'EasyReach Mode (Motor)',
+                                                'Pattern Vision Mode (Color Blind)'
+                                            ]}
+                                            className="w-full sm:w-80"
+                                        />
+                                    </div>
+
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5">
                                         <div className="flex items-center justify-between mb-3">
-                                            <label htmlFor="text-scale" className="text-sm font-bold text-slate-900">Text Size Scaling</label>
+                                            <label htmlFor="text-scale-v" className="text-sm font-bold text-slate-900">Text Size Scaling</label>
                                             <span className="text-sm font-bold text-blue-600">{textScale}%</span>
                                         </div>
                                         <input
-                                            id="text-scale"
+                                            id="text-scale-v"
                                             type="range"
                                             min={100}
                                             max={200}
@@ -236,21 +560,22 @@ export default function SettingsPage() {
                             </section>
                         )}
 
-                        {/* Audio tab */}
+                        {/* ── Audio tab ──────────────────────────────── */}
                         {activeTab === 'audio' && (
                             <section aria-labelledby="audio-heading">
-                                <SectionHeading id="audio-heading"
+                                <SectionHeading
+                                    id="audio-heading"
                                     icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="5" y="1" width="6" height="9" rx="3" /><path d="M2 9a6 6 0 0 0 12 0M8 15v-2" strokeLinecap="round" /></svg>}
                                     title="Audio & Voice Synthesis"
                                 />
                                 <div className="space-y-3">
-                                    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5">
                                         <div className="flex items-center justify-between mb-3">
-                                            <label htmlFor="voice-speed" className="text-sm font-bold text-slate-900">Voice Synthesis Speed</label>
+                                            <label htmlFor="voice-speed-a" className="text-sm font-bold text-slate-900">Voice Synthesis Speed</label>
                                             <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{voiceSpeed.toFixed(1)}x</span>
                                         </div>
                                         <input
-                                            id="voice-speed"
+                                            id="voice-speed-a"
                                             type="range"
                                             min={0.5}
                                             max={2.5}
@@ -269,60 +594,87 @@ export default function SettingsPage() {
                             </section>
                         )}
 
-                        {/* Shortcuts tab */}
+                        {/* ── Shortcuts tab ──────────────────────────── */}
                         {activeTab === 'shortcuts' && (
                             <section aria-labelledby="shortcuts-heading">
-                                <SectionHeading id="shortcuts-heading"
+                                <SectionHeading
+                                    id="shortcuts-heading"
                                     icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="2" /><path d="M4 9h2M10 9h2M4 11.5h8" strokeLinecap="round" /></svg>}
                                     title="Keyboard Shortcut Map"
                                 />
-                                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                    <table className="w-full text-sm" aria-label="Keyboard shortcuts">
-                                        <thead className="border-b border-slate-100">
-                                            <tr>
-                                                {shortcuts.map(s => (
-                                                    <th key={s.section} scope="col" colSpan={2} className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 border-r border-slate-100 last:border-r-0">{s.section}</th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {Array.from({ length: Math.max(...shortcuts.map(s => s.items.length)) }).map((_, i) => (
-                                                <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                                                    {shortcuts.map(section => {
-                                                        const item = section.items[i];
-                                                        return item ? (
-                                                            <Fragment key={section.section}>
-                                                                <td className="px-5 py-3 text-slate-700 font-medium text-xs">{item.action}</td>
-                                                                <td className="px-5 py-3 text-right border-r border-slate-100 last:border-r-0">
-                                                                    <kbd className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
-                                                                        {item.keys.join(' + ')}
-                                                                    </kbd>
-                                                                </td>
-                                                            </Fragment>
-                                                        ) : (
-                                                            <Fragment key={section.section}><td className="px-5 py-3" /><td className="px-5 py-3 border-r border-slate-100 last:border-r-0" /></Fragment>
-                                                        );
-                                                    })}
-                                                </tr>
+
+                                {/* Mobile: card list; Desktop: table */}
+                                <div className="sm:hidden space-y-4">
+                                    {shortcuts.map(section => (
+                                        <div key={section.section} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                            <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{section.section}</p>
+                                            </div>
+                                            {section.items.map(item => (
+                                                <div key={item.action} className="flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-b-0">
+                                                    <span className="text-sm text-slate-700 font-medium">{item.action}</span>
+                                                    <kbd className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md shrink-0">
+                                                        {item.keys.join(' + ')}
+                                                    </kbd>
+                                                </div>
                                             ))}
-                                        </tbody>
-                                    </table>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Desktop table */}
+                                <div className="hidden sm:block bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm" aria-label="Keyboard shortcuts">
+                                            <thead className="border-b border-slate-100">
+                                                <tr>
+                                                    {shortcuts.map(s => (
+                                                        <th key={s.section} scope="col" colSpan={2} className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 border-r border-slate-100 last:border-r-0">{s.section}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Array.from({ length: Math.max(...shortcuts.map(s => s.items.length)) }).map((_, i) => (
+                                                    <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                                                        {shortcuts.map(section => {
+                                                            const item = section.items[i];
+                                                            return item ? (
+                                                                <Fragment key={section.section}>
+                                                                    <td className="px-5 py-3 text-slate-700 font-medium text-xs">{item.action}</td>
+                                                                    <td className="px-5 py-3 text-right border-r border-slate-100 last:border-r-0">
+                                                                        <kbd className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+                                                                            {item.keys.join(' + ')}
+                                                                        </kbd>
+                                                                    </td>
+                                                                </Fragment>
+                                                            ) : (
+                                                                <Fragment key={section.section}>
+                                                                    <td className="px-5 py-3" />
+                                                                    <td className="px-5 py-3 border-r border-slate-100 last:border-r-0" />
+                                                                </Fragment>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </section>
                         )}
 
                         {/* Save / Reset */}
-                        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200">
+                        <div className="flex flex-col-reverse xs:flex-row items-stretch xs:items-center justify-end gap-3 pt-4 border-t border-slate-200">
                             <button
                                 onClick={handleReset}
-                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                className="w-full xs:w-auto px-5 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
                             >
                                 Reset to Default
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={saving}
-                                className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${saved ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'} ${saving ? 'opacity-75 cursor-not-allowed' : ''}`}
+                                className={`w-full xs:w-auto px-5 py-3 rounded-xl text-sm font-bold text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${saved ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'} ${saving ? 'opacity-75 cursor-not-allowed' : ''}`}
                             >
                                 {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Preferences'}
                             </button>
