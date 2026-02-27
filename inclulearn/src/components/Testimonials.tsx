@@ -3,7 +3,7 @@ import { Separator } from '@/components/ui/separator';
 
 const testimonials = [
     {
-        quote: 'EduLearn changed how I study. The screen reader support is flawless and makes me feel truly independent.',
+        quote: 'EduAble changed how I study. The screen reader support is flawless and makes me feel truly independent.',
         name: 'Alex Johnson',
         role: 'Computer Science Student',
         initials: 'AJ',

@@ -176,10 +176,10 @@ export default function OnboardingPage() {
                 accessibilityPreferences: prefs,
             };
             await profileApi.create(payload);
-            const stored = localStorage.getItem('edulearn_user');
+            const stored = localStorage.getItem('EduAble_user');
             if (stored) {
                 const u = JSON.parse(stored);
-                localStorage.setItem('edulearn_user', JSON.stringify({ ...u, onboardingCompleted: true }));
+                localStorage.setItem('EduAble_user', JSON.stringify({ ...u, onboardingCompleted: true }));
             }
             router.push('/dashboard');
         } catch (err: unknown) {
@@ -203,7 +203,7 @@ export default function OnboardingPage() {
                                 <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                             </svg>
                         </div>
-                        EduLearn
+                        EduAble
                     </a>
                     <h1 className="text-xl sm:text-2xl font-extrabold text-foreground leading-tight">
                         Set up your accessibility profile

@@ -5,7 +5,7 @@ const PROTECTED = ['/dashboard', '/onboarding', '/courses', '/progress', '/setti
 const AUTH_ONLY = ['/login', '/register'];
 
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get('edulearn_token')?.value;
+  const token = req.cookies.get('EduAble_token')?.value;
   const { pathname } = req.nextUrl;
 
   // Redirect unauthenticated users away from protected routes

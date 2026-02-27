@@ -44,7 +44,7 @@ export default function RegisterPage() {
         setLoading(true);
         try {
             const data = await authApi.register(form);
-            document.cookie = `edulearn_token=${data.token}; path=/; max-age=${7 * 24 * 3600}; SameSite=Lax`;
+            document.cookie = `EduAble_token=${data.token}; path=/; max-age=${7 * 24 * 3600}; SameSite=Lax`;
             login(data.user, data.token);
             router.push('/onboarding');
         } catch (err: unknown) {
@@ -72,7 +72,7 @@ export default function RegisterPage() {
                                 <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
                             </svg>
                         </div>
-                        EduLearn
+                        EduAble
                     </a>
                     <h1 className="text-2xl font-extrabold text-foreground mt-6 mb-1">Create your account</h1>
                     <p className="text-sm text-muted-foreground">Join 50,000+ students learning without barriers.</p>

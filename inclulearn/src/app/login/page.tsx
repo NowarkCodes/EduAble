@@ -35,7 +35,7 @@ export default function LoginPage() {
         try {
             const data = await authApi.login({ email: form.email, password: form.password });
             // Store token in cookie for middleware + localStorage for API calls
-            document.cookie = `edulearn_token=${data.token}; path=/; max-age=${7 * 24 * 3600}; SameSite=Lax`;
+            document.cookie = `EduAble_token=${data.token}; path=/; max-age=${7 * 24 * 3600}; SameSite=Lax`;
             login(data.user, data.token);
             router.push(data.user.onboardingCompleted ? '/dashboard' : '/onboarding');
         } catch (err: unknown) {
@@ -56,7 +56,7 @@ export default function LoginPage() {
                                 <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
                             </svg>
                         </div>
-                        EduLearn
+                        EduAble
                     </a>
                     <h1 className="text-2xl font-extrabold text-foreground mt-6 mb-1">Welcome back</h1>
                     <p className="text-sm text-muted-foreground">Sign in to continue your accessible learning journey.</p>

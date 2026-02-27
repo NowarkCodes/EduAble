@@ -3,9 +3,9 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'EduLearn — Accessible Education for Every Student',
+  title: 'EduAble — Accessible Education for Every Student',
   description:
-    'EduLearn is an accessible e-learning platform built to WCAG 2.1 AA standards. Screen reader ready, keyboard friendly, and designed for every learner.',
+    'EduAble is an accessible e-learning platform built to WCAG 2.1 AA standards. Screen reader ready, keyboard friendly, and designed for every learner.',
   keywords: ['accessible education', 'e-learning', 'WCAG', 'screen reader', 'inclusive learning'],
 };
 

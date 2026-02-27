@@ -608,7 +608,7 @@ export default function DashboardPage() {
                                     </span>
                                 </div>
                                 <p className="uppercase tracking-widest text-[10px] text-slate-400 text-right">
-                                    © 2024 LearnAI Platform<br />
+                                    © 2024 EduAble Platform<br />
                                     <span aria-label="Tagline">Accessibility-First Learning</span>
                                 </p>
                             </footer>
