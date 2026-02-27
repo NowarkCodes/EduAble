@@ -16,6 +16,7 @@ interface ExploreCourse {
     started: boolean;
     tags: string[];
     image: string;
+    videos?: string[];
 }
 
 function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -23,22 +24,6 @@ function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
         <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" {...props}>
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-    );
-}
-
-function FilterIcon(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" {...props}>
-            <line x1="4" y1="21" x2="4" y2="14" />
-            <line x1="4" y1="10" x2="4" y2="3" />
-            <line x1="12" y1="21" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12" y2="3" />
-            <line x1="20" y1="21" x2="20" y2="16" />
-            <line x1="20" y1="12" x2="20" y2="3" />
-            <line x1="1" y1="14" x2="7" y2="14" />
-            <line x1="9" y1="8" x2="15" y2="8" />
-            <line x1="17" y1="16" x2="23" y2="16" />
         </svg>
     );
 }
@@ -109,6 +94,23 @@ function CourseCard({ course }: { course: ExploreCourse }) {
                         </div>
                     )}
 
+                    {/* Showcased Videos from NGO Dashboard */}
+                    {course.videos && course.videos.length > 0 && (
+                        <div className="mb-4">
+                            <p className="text-xs font-bold text-slate-700 mb-2">Included Lessons:</p>
+                            <ul className="text-sm text-slate-600 space-y-1.5 pl-4 m-0 list-disc">
+                                {course.videos.slice(0, 3).map((videoTitle, i) => (
+                                    <li key={i} className="truncate">{videoTitle}</li>
+                                ))}
+                                {course.videos.length > 3 && (
+                                    <li className="text-slate-400 italic text-xs list-none -ml-4">
+                                        + {course.videos.length - 3} more
+                                    </li>
+                                )}
+                            </ul>
+                        </div>
+                    )}
+
                     <Link
                         href={`/courses/${course.id}`}
                         className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-blue-700 transition-colors relative z-10"
@@ -128,20 +130,30 @@ export default function ExploreCoursesPage() {
     const { user, token } = useAuth();
     const [courses, setCourses] = useState<ExploreCourse[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [selectedLevel, setSelectedLevel] = useState('All');
 
     const initials = (user?.name ?? 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
+    // Derive unique categories from live data
+    const categories = ['All', ...Array.from(new Set(courses.map(c => c.category).filter(Boolean)))];
+
     const fetchExplore = useCallback(async () => {
         try {
+            setError('');
             const res = await fetch('http://localhost:5000/api/courses/explore', {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {
                 const data = await res.json();
                 setCourses(data.courses ?? []);
+            } else {
+                setError('Server returned an error. Please try again.');
             }
-        } catch (e) {
-            console.error(e);
+        } catch {
+            setError('Could not connect to server. Is the backend running?');
         } finally {
             setLoading(false);
         }
@@ -151,6 +163,16 @@ export default function ExploreCoursesPage() {
         if (token) fetchExplore();
         else setLoading(false);
     }, [token, fetchExplore]);
+
+    // Derived filtered list
+    const filteredCourses = courses.filter(c => {
+        const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              c.instructor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              c.category?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = selectedCategory === 'All' || c.category === selectedCategory;
+        const matchesLevel = selectedLevel === 'All' || c.level === selectedLevel;
+        return matchesSearch && matchesCategory && matchesLevel;
+    });
 
     return (
         <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
@@ -173,30 +195,31 @@ export default function ExploreCoursesPage() {
                         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search courses (e.g. Intro to Prompt Engineering)"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="Search by title, instructor, or category…"
                             className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-sm"
                         />
                     </div>
 
                     <div className="flex gap-3">
-                        <select className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none cursor-pointer">
-                            <option>All Categories</option>
-                            <option>AI Basics</option>
-                            <option>Prompt Eng</option>
-                            <option>Ethics</option>
+                        <select
+                            value={selectedCategory}
+                            onChange={e => setSelectedCategory(e.target.value)}
+                            className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none cursor-pointer"
+                        >
+                            {categories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>)}
                         </select>
 
-                        <select className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none cursor-pointer">
-                            <option>Difficulty</option>
-                            <option>Beginner</option>
-                            <option>Intermediate</option>
-                            <option>Advanced</option>
+                        <select
+                            value={selectedLevel}
+                            onChange={e => setSelectedLevel(e.target.value)}
+                            className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none cursor-pointer"
+                        >
+                            {['All', 'Beginner', 'Foundations', 'Intermediate', 'Advanced'].map(l => (
+                                <option key={l} value={l}>{l === 'All' ? 'All Levels' : l}</option>
+                            ))}
                         </select>
-
-                        <button className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-blue-50 text-blue-700 font-bold text-sm border border-blue-100 hover:bg-blue-100 transition-colors shadow-sm">
-                            <FilterIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">More Filters</span>
-                        </button>
                     </div>
                 </div>
 
@@ -206,8 +229,42 @@ export default function ExploreCoursesPage() {
                         Array.from({ length: 6 }).map((_, i) => (
                             <div key={i} className="animate-pulse bg-white border border-slate-200 rounded-2xl h-96" />
                         ))
+                    ) : error ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20 text-center gap-4">
+                            <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                            </div>
+                            <p className="font-bold text-lg text-slate-700">Could not load courses</p>
+                            <p className="text-sm text-slate-400 max-w-xs">{error}</p>
+                            <button
+                                onClick={() => { setLoading(true); fetchExplore(); }}
+                                className="px-6 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    ) : filteredCourses.length === 0 ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20 text-center text-slate-400 gap-4">
+                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            {courses.length === 0 ? (
+                                <>
+                                    <p className="font-bold text-lg text-slate-600">No courses yet</p>
+                                    <p className="text-sm max-w-xs">An NGO hasn&apos;t created any courses yet. Check back soon!</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="font-bold text-lg text-slate-600">No results found</p>
+                                    <p className="text-sm">Try adjusting your search or filters.</p>
+                                    <button onClick={() => { setSearchQuery(''); setSelectedCategory('All'); setSelectedLevel('All'); }} className="text-blue-600 font-bold text-sm hover:underline">Clear filters</button>
+                                </>
+                            )}
+                        </div>
                     ) : (
-                        courses.map(course => (
+                        filteredCourses.map(course => (
                             <CourseCard key={course.id} course={course} />
                         ))
                     )}

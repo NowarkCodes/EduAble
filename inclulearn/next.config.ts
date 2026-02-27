@@ -7,14 +7,16 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com',
+        hostname: '**',
       },
     ],
   },
   async headers() {
     return [
       {
-        source: '/(.*)',
+        // Only apply COEP/COOP on the NGO dashboard where FFmpeg WebAssembly needs them.
+        // Applying these globally blocks cross-origin resources (like GCS videos) on other pages.
+        source: '/ngo-dashboard/:path*',
         headers: [
           {
             key: 'Cross-Origin-Embedder-Policy',
