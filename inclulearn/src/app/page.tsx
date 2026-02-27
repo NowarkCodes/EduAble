@@ -8,10 +8,6 @@ import Footer from '@/components/Footer';
 export default function HomePage() {
   return (
     <>
-      {/* Skip to main content - must be the very first focusable element */}
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
 
       <Header />
 
