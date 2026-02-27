@@ -5,7 +5,13 @@ const Course = require('../models/Course');
 const Lesson = require('../models/Lesson');
 const authMiddleware = require('../middleware/auth');
 const requireRole = require('../middleware/role');
-const { getStats, updateStats } = require('../controllers/ngoController');
+const {
+  getStats,
+  updateStats,
+  getQuizCompletionByDisability,
+  getAvgScoreByDisability,
+  getA11yModeUsage
+} = require('../controllers/ngoController');
 
 const router = express.Router();
 
@@ -26,6 +32,15 @@ router.get('/stats', getStats);
 
 // Only admin/ngo users can mutate NGO stats
 router.patch('/stats', authMiddleware, requireRole('admin', 'ngo'), updateStats);
+
+
+/* ── NGO ADVANCED ANALYTICS (Requires auth + 'ngo'/'admin' role) ─── */
+const adminOrNgo = [authMiddleware, requireRole('admin', 'ngo')];
+
+router.get('/analytics/quiz-completion', adminOrNgo, getQuizCompletionByDisability);
+router.get('/analytics/avg-score', adminOrNgo, getAvgScoreByDisability);
+router.get('/analytics/a11y-usage', adminOrNgo, getA11yModeUsage);
+
 
 // Endpoint to generate Secure Presigned URLs for direct browser-to-cloud uploads
 router.post('/upload-urls', async (req, res) => {
@@ -86,6 +101,7 @@ async function getSignedReadUrl(filePath) {
 router.get('/videos', async (req, res) => {
   try {
     const [files] = await storage.bucket(uploadBucket).getFiles({ prefix: 'uploads/videos/' });
+
 
     const videoPromises = files
       .filter(file => file.name !== 'uploads/videos/') // skip folder entry
@@ -162,7 +178,7 @@ router.post('/courses', authMiddleware, requireRole('admin', 'ngo'), async (req,
       level: level || 'Beginner',
       totalLessons: videos.length,
       totalDuration: Math.round(totalDuration / 60), // in minutes
-      isPublished: true, 
+      isPublished: true,
     });
     // Create a lesson for each video selected.
     // IMPORTANT: v.url may be a signed URL (expires in 1hr). Strip the
