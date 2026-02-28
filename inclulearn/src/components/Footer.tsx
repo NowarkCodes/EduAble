@@ -1,3 +1,6 @@
+import Link from 'next/link';
+import Logo from '@/components/Logo';
+
 const footerLinks = {
     Platform: ['Courses', 'Instructors', 'Certifications', 'Live Sessions'],
     Accessibility: ['VPAT Report', 'Screen Readers', 'Keyboard Docs', 'Tools & Plugins'],
@@ -17,22 +20,15 @@ export default function Footer() {
 
                     {/* Brand & Description */}
                     <div className="sm:col-span-2 lg:col-span-1">
-                        <a
+                        <Link
                             href="/"
                             className="inline-flex items-center gap-3 sm:gap-4 font-black text-lg sm:text-xl lg:text-2xl tracking-tight 
                                      mb-4 sm:mb-6 text-background hover:opacity-90 transition-all duration-300 group"
                             aria-label="EduAble — Home"
                         >
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl 
-                                          bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center 
-                                          shrink-0 shadow-xl group-hover:scale-110 transition-all duration-300"
-                                aria-hidden="true">
-                                <svg className="w-full h-full drop-shadow-md" viewBox="0 0 24 24" fill="none">
-                                    <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-                                </svg>
-                            </div>
+                            <Logo className="w-10 h-10 lg:w-12 lg:h-12 text-white group-hover:scale-110 transition-transform duration-300" />
                             <span className="leading-tight">EduAble</span>
-                        </a>
+                        </Link>
 
                         <p className="text-sm sm:text-base text-background/80 leading-relaxed max-w-md lg:max-w-none mb-6 sm:mb-8">
                             Accessible education for everyone. Built with WCAG 2.1 AA compliance from the ground up.
@@ -66,7 +62,7 @@ export default function Footer() {
                             <ul className="flex flex-col gap-2 sm:gap-3 lg:gap-4 list-none space-y-1" role="list">
                                 {links.map((link) => (
                                     <li key={link}>
-                                        <a
+                                        <Link
                                             href="#"
                                             className="group inline-flex items-center gap-2 text-sm sm:text-base text-background/70 
                                                      hover:text-background hover:translate-x-1 transition-all duration-200 
@@ -78,7 +74,7 @@ export default function Footer() {
                                             <svg className="w-3 h-3 sm:w-4 sm:h-4 opacity-0 group-hover:opacity-100 transition-all duration-200 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                             </svg>
-                                        </a>
+                                        </Link>
                                     </li>
                                 ))}
                             </ul>

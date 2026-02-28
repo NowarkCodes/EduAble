@@ -76,6 +76,7 @@ export function AccessibilityProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const storedTheme = localStorage.getItem('EduAble_blinkitTheme');
         if (storedTheme) {
+            // eslint-disable-next-line
             setBlinkitThemeState(storedTheme);
         }
     }, []);
