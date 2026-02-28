@@ -34,6 +34,19 @@ const LessonProgressSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
+
+        // Phase 4 — NGO analytics: gesture + sign overlay usage
+        // Number of gesture events fired during this lesson session
+        gestureEventsCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        // Whether the student used the sign language overlay during this lesson
+        signOverlayUsed: {
+            type: Boolean,
+            default: false,
+        },
     },
     { timestamps: true }
 );

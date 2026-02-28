@@ -5,7 +5,14 @@ import { useParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import type { GestureId } from '@/components/GestureEngine';
 import FeedbackModal from '@/components/FeedbackModal';
+
+// ─── Gesture & Sign Language — lazy-loaded (code-split, zero cost when unused)
+const GestureEngine = dynamic(() => import('@/components/GestureEngine'), { ssr: false });
+const GestureHUD = dynamic(() => import('@/components/GestureHUD'), { ssr: false });
+const SignOverlayPlayer = dynamic(() => import('@/components/SignOverlayPlayer'), { ssr: false });
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -20,6 +27,20 @@ interface Lesson {
     notesMarkdown?: string;
     completed?: boolean;
     transcript?: string;
+    signLanguageVttUrl?: string;
+}
+
+interface AccessibilityPreferences {
+    signLanguageSupport: boolean;
+    gestureNavigationEnabled: boolean;
+    preferredSignLanguage: 'ISL' | 'ASL' | 'none';
+    signOverlayPosition: 'top-left' | 'bottom-left' | 'floating';
+    captionSize: string;
+    [key: string]: unknown;
+}
+
+interface AccessibilityProfile {
+    accessibilityPreferences: AccessibilityPreferences;
 }
 
 interface CourseData {
@@ -169,6 +190,7 @@ export default function CourseDetailPage() {
     const [isEnrolling, setIsEnrolling] = useState(false);
     const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
     const [isFetchingVideo, setIsFetchingVideo] = useState(false);
+    const [playedPercentage, setPlayedPercentage] = useState(0);
 
     // Mobile transcript accordion
     const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -181,6 +203,15 @@ export default function CourseDetailPage() {
     const [isTranscriptSearchOpen, setIsTranscriptSearchOpen] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
+
+    // ── Accessibility / Gesture / Sign Language state ─────────────────────────
+    const [accessibilityProfile, setAccessibilityProfile] = useState<AccessibilityProfile | null>(null);
+    const [gestureEnabled, setGestureEnabled] = useState(false);
+    const [activeGesture, setActiveGesture] = useState<GestureId | null>(null);
+    const gestureStreamRef = useRef<MediaStream | null>(null);
+    const [
+        , setCaptionsVisible
+    ] = useState(true); // mirrors caption track state
 
     // ── Fetch course + lessons ────────────────────────────────────────────────
 
@@ -217,6 +248,24 @@ export default function CourseDetailPage() {
     }, [token, id]);
 
     useEffect(() => { fetchCourse(); }, [fetchCourse]);
+
+    // ── Fetch accessibility profile ──────────────────────────────────────────
+    useEffect(() => {
+        if (!token) return;
+        fetch(`${BACKEND}/api/profile/accessibility`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                setAccessibilityProfile(data);
+                // Hydrate gesture-nav flag from saved profile
+                if (data?.accessibilityPreferences?.gestureNavigationEnabled) {
+                    setGestureEnabled(true);
+                }
+            })
+            .catch(() => null);
+    }, [token]);
 
     // ── Auto-enroll ───────────────────────────────────────────────────────────
 
@@ -300,6 +349,7 @@ export default function CourseDetailPage() {
 
     useEffect(() => {
         if (videoRef.current) videoRef.current.load();
+        setPlayedPercentage(0);
     }, [currentLessonIdx]);
 
     // ── Derived ───────────────────────────────────────────────────────────────
@@ -333,12 +383,69 @@ export default function CourseDetailPage() {
         }
     }, [token, id, currentLesson]);
 
+    // ── Watch Progress Tracking ───────────────────────────────────────────────
+
+    const handleTimeUpdate = useCallback(() => {
+        const v = videoRef.current;
+        if (!v || !v.duration) return;
+        const pct = Math.round((v.currentTime / v.duration) * 100);
+        setPlayedPercentage(pct);
+        // Auto-complete at 90%
+        if (pct >= 90 && currentLesson && !currentLesson.completed) {
+            handleCompleteLesson();
+        }
+    }, [currentLesson, handleCompleteLesson]);
+
     const goToLesson = (idx: number) => {
         setCurrentLessonIdx(idx);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // ── Gesture handler — wired to existing controls ────────────────────────
+    const handleGesture = useCallback((id: GestureId) => {
+        setActiveGesture(id);
+        // Clear label after 2 s
+        setTimeout(() => setActiveGesture(null), 2000);
+
+        switch (id) {
+            case 'play_pause':
+                if (videoRef.current) {
+                    if (videoRef.current.paused) videoRef.current.play().catch(() => null);
+                    else videoRef.current.pause();
+                }
+                break;
+            case 'next_lesson':
+                if (hasNext) goToLesson(currentLessonIdx + 1);
+                break;
+            case 'prev_lesson':
+                if (hasPrev) goToLesson(currentLessonIdx - 1);
+                break;
+            case 'toggle_captions':
+                setCaptionsVisible(prev => {
+                    const track = videoRef.current?.textTracks[0];
+                    if (track) track.mode = prev ? 'hidden' : 'showing';
+                    return !prev;
+                });
+                break;
+            case 'raise_hand':
+                // Announce via screen-reader live region (non-intrusive)
+                if (typeof window !== 'undefined') {
+                    const el = document.getElementById('gesture-sr-announce');
+                    if (el) el.textContent = 'Hand raised — educator notified.';
+                }
+                break;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasNext, hasPrev, currentLessonIdx]);
+
     const calculatedTotalDuration = Math.round(lessons.reduce((acc, l) => acc + (l.duration || 0), 0) / 60);
+
+    // ── Derived sign overlay prefs ────────────────────────────────────────────
+    const signPrefs = accessibilityProfile?.accessibilityPreferences;
+    const showSignOverlay =
+        signPrefs?.signLanguageSupport === true &&
+        signPrefs?.preferredSignLanguage !== 'none' &&
+        !!currentLesson?.signLanguageVttUrl;
 
     // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -395,26 +502,49 @@ export default function CourseDetailPage() {
                                                 <p className="text-xs sm:text-sm font-semibold">Loading video…</p>
                                             </div>
                                         ) : playbackUrl ? (
-                                            <video
-                                                key={playbackUrl}
-                                                ref={videoRef}
-                                                controls
-                                                autoPlay={false}
-                                                className="w-full max-h-[56vw] sm:max-h-[480px] lg:max-h-[560px] rounded-2xl bg-black"
-                                                controlsList="nodownload"
-                                                onLoadedMetadata={handleLoadedMetadata}
-                                                onEnded={handleCompleteLesson}
-                                                aria-label={`Video: ${currentLesson?.title}`}
-                                                onError={() => { setPlaybackUrl(null); setIsFetchingVideo(false); }}
-                                            >
-                                                <source src={playbackUrl} type="video/mp4" />
-                                                <source src={playbackUrl} type="video/webm" />
-                                                <track kind="captions" label="Auto-generated captions" default />
-                                                <p className="text-white p-4 text-sm">
-                                                    Your browser does not support the video element.{' '}
-                                                    <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
-                                                </p>
-                                            </video>
+                                            <div className="relative">
+                                                <video
+                                                    key={playbackUrl}
+                                                    ref={videoRef}
+                                                    controls
+                                                    autoPlay={false}
+                                                    className="w-full max-h-[56vw] sm:max-h-[480px] lg:max-h-[560px] rounded-2xl bg-black"
+                                                    controlsList="nodownload"
+                                                    onLoadedMetadata={handleLoadedMetadata}
+                                                    onTimeUpdate={handleTimeUpdate}
+                                                    onEnded={handleCompleteLesson}
+                                                    aria-label={`Video: ${currentLesson?.title}`}
+                                                    onError={() => { setPlaybackUrl(null); setIsFetchingVideo(false); }}
+                                                >
+                                                    <source src={playbackUrl} type="video/mp4" />
+                                                    <source src={playbackUrl} type="video/webm" />
+                                                    <track kind="captions" label="Auto-generated captions" default />
+                                                    <p className="text-white p-4 text-sm">
+                                                        Your browser does not support the video element.{' '}
+                                                        <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
+                                                    </p>
+                                                </video>
+
+                                                {/* Watch Progress Bar */}
+                                                {currentLesson && (
+                                                    <div className="bg-slate-900 text-slate-300 text-xs px-4 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto min-w-0">
+                                                            <span className="font-bold text-blue-400 whitespace-nowrap">Watch Progress: {playedPercentage}%</span>
+                                                            <div className="w-full sm:w-48 lg:w-64 h-2 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                                                                <div className="h-full bg-blue-500 transition-all duration-300 origin-left" style={{ width: `${playedPercentage}%` }} />
+                                                            </div>
+                                                        </div>
+                                                        {currentLesson.completed ? (
+                                                            <span className="text-emerald-400 font-bold flex items-center gap-1.5 bg-emerald-400/10 px-3 py-1.5 rounded-full shrink-0">
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                Lesson Completed!
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-500 font-medium shrink-0 animate-pulse">Watch 90% to complete</span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         ) : currentLesson?.videoUrl ? (
                                             <div className="aspect-video flex flex-col items-center justify-center gap-3 sm:gap-4 bg-slate-900 text-slate-300 p-4">
                                                 <VideoIcon />
@@ -725,6 +855,52 @@ export default function CourseDetailPage() {
                 </footer>
             </DashboardLayout>
 
+            {/* ── Screen-reader live region for gesture announcements ─────────── */}
+            <div
+                id="gesture-sr-announce"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className="sr-only"
+            />
+
+            {/* ── Gesture Engine (headless, zero render cost when disabled) ────── */}
+            {
+                gestureEnabled && (
+                    <GestureEngine
+                        onGesture={handleGesture}
+                        cooldownMs={1500}
+                    />
+                )
+            }
+
+            {/* ── Gesture HUD ──────────────────────────────────────────────────── */}
+            {
+                signPrefs?.gestureNavigationEnabled && (
+                    <GestureHUD
+                        activeGesture={activeGesture}
+                        enabled={gestureEnabled}
+                        onToggle={() => setGestureEnabled(prev => !prev)}
+                        stream={gestureStreamRef.current}
+                    />
+                )
+            }
+
+            {/* ── Sign Language Overlay ────────────────────────────────────────── */}
+            {
+                showSignOverlay && (
+                    <SignOverlayPlayer
+                        mainVideoRef={videoRef}
+                        vttUrl={currentLesson!.signLanguageVttUrl!}
+                        preferredLanguage={signPrefs!.preferredSignLanguage as 'ISL' | 'ASL'}
+                        position={signPrefs!.signOverlayPosition as 'top-left' | 'bottom-left' | 'floating'}
+                        backendUrl={BACKEND}
+                        token={token}
+                    />
+                )
+            }
+
+            {/* ── Feedback Modal ────────────────────────────────────────────────── */}
             <FeedbackModal
                 isOpen={isFeedbackOpen}
                 onCloseAction={() => setIsFeedbackOpen(false)}

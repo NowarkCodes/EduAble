@@ -1,495 +1,619 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import {
-    Search,
-    MoreVertical,
-    Video,
-    Plus,
-    Mic,
-    Smile,
-    Send,
-    Edit,
-    CheckCheck,
-    ChevronLeft,
-    Phone
+    Send, Search, Edit, ChevronLeft, Plus, MessageCircle,
+    CheckCheck, Clock, CheckCircle, XCircle, AlertCircle, X
 } from 'lucide-react';
-import Image from 'next/image';
 
-/* ── Types ───────────────────────────────────────── */
-interface Message {
-    id: string;
-    text: string;
-    sender: 'me' | 'other';
-    time: string;
-    avatar?: string;
-    status?: 'sent' | 'delivered' | 'read';
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+/* ── Types ─────────────────────────────────────────────────────────────── */
+interface ChatMessage {
+    _id: string;
+    sender: string;
+    senderName: string;
+    senderRole: 'student' | 'ngo' | 'admin';
+    message: string;
+    timestamp: string;
+    isRead: boolean;
 }
 
-interface Conversation {
-    id: string;
-    name: string;
-    role: 'INSTRUCTOR' | 'PEER' | 'STUDY GROUP';
-    lastMessage: string;
-    time: string;
-    avatar: string;
-    online?: boolean;
-    unread?: number;
+interface Ticket {
+    _id: string;
+    subject: string;
+    status: 'open' | 'in_progress' | 'resolved' | 'closed';
+    student: { _id: string; name: string; email: string };
+    ngo: { _id: string; name: string; email: string } | null;
+    messages: ChatMessage[];
+    lastMessageAt: string;
+    createdAt: string;
 }
 
-/* ── Mock Data ───────────────────────────────────── */
-const MOCK_CONVERSATIONS: Conversation[] = [
-    {
-        id: '1',
-        name: 'Dr. Sarah Jenkins',
-        role: 'INSTRUCTOR',
-        lastMessage: 'The new assignment is ready for review.',
-        time: '10:45 AM',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&auto=format&fit=crop',
-        online: true,
-        unread: 2,
-    },
-    {
-        id: '2',
-        name: 'Marcus T.',
-        role: 'PEER',
-        lastMessage: 'Did you see the latest quiz results?',
-        time: 'Yesterday',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&auto=format&fit=crop',
-    },
-    {
-        id: '3',
-        name: 'Design Thinking GRP',
-        role: 'STUDY GROUP',
-        lastMessage: 'Elena: Meeting at 3pm today?',
-        time: 'Wed',
-        avatar: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=100&h=100&auto=format&fit=crop',
-        unread: 5,
-    },
-];
-
-const MOCK_MESSAGES_MAP: Record<string, Message[]> = {
-    '1': [
-        {
-            id: 'm1-1',
-            text: "Hello! I've just uploaded the resources for Module 4. Please take a look when you have a moment.",
-            sender: 'other',
-            time: '10:30 AM',
-            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&auto=format&fit=crop',
-        },
-        {
-            id: 'm1-2',
-            text: "Thank you, Dr. Jenkins! I'll review them this afternoon. Does the assignment cover the same topics?",
-            sender: 'me',
-            time: '10:42 AM',
-            status: 'read',
-        },
-        {
-            id: 'm1-3',
-            text: "Yes, exactly. I've also included a quick self-assessment quiz to help you prep. The new assignment is ready for you in the dashboard now.",
-            sender: 'other',
-            time: '10:45 AM',
-            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&auto=format&fit=crop',
-        },
-    ],
-    '2': [
-        {
-            id: 'm2-1',
-            text: "Hey, did you finish the assignment for Module 3 yet?",
-            sender: 'other',
-            time: 'Yesterday',
-            avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&auto=format&fit=crop',
-        },
-        {
-            id: 'm2-2',
-            text: "Almost! Just stuck on the last part about high contrast modes.",
-            sender: 'me',
-            time: 'Yesterday',
-            status: 'read',
-        },
-    ],
-    '3': [
-        {
-            id: 'm3-1',
-            text: "Meeting at 3pm today everyone?",
-            sender: 'other',
-            time: 'Wed',
-            avatar: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=100&h=100&auto=format&fit=crop',
-        },
-        {
-            id: 'm3-2',
-            text: "I might be 5 mins late!",
-            sender: 'me',
-            time: 'Wed',
-            status: 'read',
-        },
-    ],
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+const STATUS_META: Record<Ticket['status'], { label: string; color: string; icon: React.ReactNode }> = {
+    open: { label: 'Open', color: 'bg-blue-100 text-blue-700', icon: <Clock size={12} /> },
+    in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-700', icon: <AlertCircle size={12} /> },
+    resolved: { label: 'Resolved', color: 'bg-emerald-100 text-emerald-700', icon: <CheckCircle size={12} /> },
+    closed: { label: 'Closed', color: 'bg-slate-100 text-slate-500', icon: <XCircle size={12} /> },
 };
 
-const ROLE_STYLES: Record<Conversation['role'], string> = {
-    INSTRUCTOR: 'bg-blue-50 text-blue-600',
-    PEER: 'bg-slate-100 text-slate-500',
-    'STUDY GROUP': 'bg-orange-50 text-orange-600',
-};
+function fmtTime(iso: string) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diff < 604800000) return d.toLocaleDateString([], { weekday: 'short' });
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
-export default function MessagesPage() {
-    const { user } = useAuth();
-    const [selectedChat, setSelectedChat] = useState<Conversation>(MOCK_CONVERSATIONS[0]);
-    const [inputText, setInputText] = useState('');
-    const [activeFilter, setActiveFilter] = useState('All Chats');
-    /* On mobile, isChatOpen controls which panel is visible */
-    const [isChatOpen, setIsChatOpen] = useState(false);
+/* ── Create Ticket Modal ────────────────────────────────────────────────── */
+function CreateTicketModal({
+    onClose,
+    onCreated,
+    token,
+}: {
+    onClose: () => void;
+    onCreated: (t: Ticket) => void;
+    token: string;
+}) {
+    const [subject, setSubject] = useState('');
+    const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    // State to hold messages for the current session to simulate interactivity
-    const [chatMessages, setChatMessages] = useState<Record<string, Message[]>>(MOCK_MESSAGES_MAP);
-
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    const initials = (user?.name ?? 'U')
-        .split(' ')
-        .map((n: string) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [selectedChat, chatMessages]);
-
-    function handleSelectChat(chat: Conversation) {
-        setSelectedChat(chat);
-        setIsChatOpen(true);
-    }
-
-    function handleSend() {
-        if (!inputText.trim()) return;
-
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            text: inputText,
-            sender: 'me',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            status: 'sent'
-        };
-
-        setChatMessages(prev => ({
-            ...prev,
-            [selectedChat.id]: [...(prev[selectedChat.id] || []), newMessage]
-        }));
-
-        setInputText('');
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!subject.trim() || !message.trim()) return;
+        setLoading(true);
+        setError('');
+        try {
+            const res = await fetch(`${BACKEND}/api/tickets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ subject: subject.trim(), message: message.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to create ticket');
+            onCreated(data.ticket);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error');
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (
-        <DashboardLayout
-            userInitials={initials}
-            userName={user?.name ?? 'User'}
-            userTier="Standard Account"
-        >
-            {/*
-             * Full-height flex container.
-             * On mobile  : only one panel visible at a time (list OR chat).
-             * On desktop : both panels side-by-side.
-             */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-extrabold text-white">Create Support Ticket</h2>
+                        <p className="text-blue-200 text-xs mt-0.5">Our NGO team will reply as soon as possible</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-xl text-blue-200 hover:text-white hover:bg-blue-500 transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
+                            {error}
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Subject</label>
+                        <input
+                            required
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            placeholder="e.g. I can't access Lesson 3"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Describe your issue</label>
+                        <textarea
+                            required
+                            rows={5}
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Tell us what's going wrong in detail so we can help you faster..."
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm resize-none transition-all"
+                        />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading || !subject.trim() || !message.trim()}
+                            className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-blue-200"
+                        >
+                            {loading ? 'Creating…' : 'Create Ticket'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+/* ── Main Page ──────────────────────────────────────────────────────────── */
+export default function MessagesPage() {
+    const { user, token } = useAuth();
+    const initials = (user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+
+    const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [loadingTickets, setLoadingTickets] = useState(true);
+    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [inputText, setInputText] = useState('');
+    const [showCreate, setShowCreate] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+    const [typers, setTypers] = useState<{ userId: string; name: string; role: string }[]>([]);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    /* ── Load tickets ─────────────────────────────────────────────────── */
+    const loadTickets = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${BACKEND}/api/tickets`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setTickets(data.tickets || []);
+                // If a ticket is selected, refresh its messages too
+                if (selectedTicket) {
+                    const updated = (data.tickets || []).find((t: Ticket) => t._id === selectedTicket._id);
+                    if (updated) setSelectedTicket(updated);
+                }
+            }
+        } catch { /* non-fatal */ } finally {
+            setLoadingTickets(false);
+        }
+    }, [token, selectedTicket]);
+
+    useEffect(() => {
+        loadTickets();
+    }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /* Poll for new messages every 5 seconds when a ticket is open */
+    useEffect(() => {
+        if (selectedTicket) {
+            const iv = setInterval(loadTickets, 5000);
+            setPollingInterval(iv);
+
+            // Poll typing status every 2s
+            const typingIv = setInterval(async () => {
+                if (!token || !selectedTicket) return;
+                try {
+                    const r = await fetch(`${BACKEND}/api/tickets/${selectedTicket._id}/typing`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const d = await r.json();
+                    if (r.ok) setTypers(d.typers || []);
+                } catch { /* non-fatal */ }
+            }, 2000);
+
+            return () => { clearInterval(iv); clearInterval(typingIv); setTypers([]); };
+        } else {
+            if (pollingInterval) clearInterval(pollingInterval);
+            setPollingInterval(null);
+            setTypers([]);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedTicket?._id]);
+
+    /* Auto-scroll */
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [selectedTicket?.messages?.length, typers.length]);
+
+    /* Emit typing signal to backend */
+    const emitTyping = useCallback(async () => {
+        if (!token || !selectedTicket) return;
+        try {
+            await fetch(`${BACKEND}/api/tickets/${selectedTicket._id}/typing`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+        } catch { /* non-fatal */ }
+    }, [token, selectedTicket]);
+
+    const stopTyping = useCallback(async () => {
+        if (!token || !selectedTicket) return;
+        try {
+            await fetch(`${BACKEND}/api/tickets/${selectedTicket._id}/typing`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+        } catch { /* non-fatal */ }
+    }, [token, selectedTicket]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInputText(e.target.value);
+        emitTyping();
+        // Auto-stop typing signal after 2.5s of no keystroke
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(stopTyping, 2500);
+    };
+
+    /* ── Send message ─────────────────────────────────────────────────── */
+    async function handleSend() {
+        if (!inputText.trim() || !selectedTicket || !token) return;
+        const text = inputText.trim();
+        setInputText('');
+        setSending(true);
+
+        // Stop typing indicator immediately on send
+        stopTyping();
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+        // Optimistic update
+        const tempMsg: ChatMessage = {
+            _id: `temp-${Date.now()}`,
+            sender: user?.id || '',
+            senderName: user?.name || 'You',
+            senderRole: user?.role as ChatMessage['senderRole'],
+            message: text,
+            timestamp: new Date().toISOString(),
+            isRead: false,
+        };
+        setSelectedTicket(prev => prev ? { ...prev, messages: [...prev.messages, tempMsg] } : prev);
+
+        try {
+            const res = await fetch(`${BACKEND}/api/tickets/${selectedTicket._id}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ message: text }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                // Replace temp with real
+                setSelectedTicket(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        messages: prev.messages.map(m => m._id === tempMsg._id ? data.message : m),
+                        status: data.ticket.status,
+                        ngo: data.ticket.ngo,
+                    };
+                });
+                setTickets(prev => prev.map(t => t._id === selectedTicket._id
+                    ? { ...t, messages: [...t.messages.filter(m => m._id !== tempMsg._id), data.message], lastMessageAt: data.message.timestamp }
+                    : t
+                ));
+            }
+        } catch { /* non-fatal */ } finally {
+            setSending(false);
+        }
+    }
+
+    /* ── Helpers ──────────────────────────────────────────────────────── */
+    const myId = user?.id || '';
+    const filtered = tickets.filter(t =>
+        t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.ngo?.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const unreadCount = (t: Ticket) =>
+        t.messages.filter(m => m.sender !== myId && !m.isRead).length;
+
+    return (
+        <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
+
+            {showCreate && token && (
+                <CreateTicketModal
+                    token={token}
+                    onClose={() => setShowCreate(false)}
+                    onCreated={(ticket) => {
+                        setTickets(prev => [ticket, ...prev]);
+                        setSelectedTicket(ticket);
+                        setIsChatOpen(true);
+                        setShowCreate(false);
+                    }}
+                />
+            )}
+
             <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-white">
 
-                {/* ─── LEFT SIDEBAR ────────────────────────────────────── */}
-                <aside
-                    className={[
-                        /* sizing */
-                        'flex flex-col shrink-0',
-                        /* mobile: full-width, hide when chat open */
-                        'w-full',
-                        /* tablet+ : fixed width, always visible */
-                        'sm:w-[340px] sm:flex sm:border-r sm:border-slate-200',
-                        /* hide/show logic on mobile */
-                        isChatOpen ? 'hidden sm:flex' : 'flex',
-                    ].join(' ')}
-                >
+                {/* ── LEFT SIDEBAR ──────────────────────────────────────────── */}
+                <aside className={[
+                    'flex flex-col shrink-0 w-full sm:w-[360px] border-r border-slate-200',
+                    isChatOpen ? 'hidden sm:flex' : 'flex',
+                ].join(' ')}>
+
                     {/* Header */}
-                    <div className="px-4 sm:px-6 pt-5 pb-3">
-                        <div className="flex items-center justify-between mb-5">
-                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                                Messages
-                            </h1>
-                            <button className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
-                                <Edit size={18} />
+                    <div className="px-5 pt-5 pb-3 border-b border-slate-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Support Chat</h1>
+                            <button
+                                onClick={() => setShowCreate(true)}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-200"
+                            >
+                                <Plus size={14} /> New Ticket
                             </button>
                         </div>
-
-                        {/* Search */}
-                        <div className="relative mb-4">
-                            <Search
-                                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                                size={16}
-                            />
+                        <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
                                 type="text"
-                                placeholder="Search conversations..."
-                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 text-sm font-medium border border-transparent focus:bg-white focus:border-blue-300 outline-none transition-all"
+                                placeholder="Search tickets…"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-300 outline-none transition-all"
                             />
-                        </div>
-
-                        {/* Filters */}
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                            {['All Chats', 'Computer Science', 'UI Design'].map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setActiveFilter(f)}
-                                    className={[
-                                        'px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all',
-                                        activeFilter === f
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
-                                    ].join(' ')}
-                                >
-                                    {f}
-                                </button>
-                            ))}
                         </div>
                     </div>
 
-                    {/* Conversation list */}
-                    <div className="flex-1 overflow-y-auto space-y-1 px-2 sm:px-3 pb-6">
-                        {MOCK_CONVERSATIONS.map((chat) => {
-                            const isActive = selectedChat.id === chat.id;
-                            return (
+                    {/* Ticket List */}
+                    <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                        {loadingTickets ? (
+                            <div className="py-16 flex flex-col items-center gap-3 text-slate-400">
+                                <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                                <p className="text-sm font-medium">Loading tickets…</p>
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="py-16 flex flex-col items-center gap-4 px-6 text-center">
+                                <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+                                    <MessageCircle size={28} className="text-blue-400" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-700 mb-1">No tickets yet</p>
+                                    <p className="text-sm text-slate-400">Create a support ticket and our NGO team will help you</p>
+                                </div>
                                 <button
-                                    key={chat.id}
-                                    onClick={() => handleSelectChat(chat)}
-                                    className={[
-                                        'w-full flex items-center gap-3 p-3 sm:p-4 rounded-2xl transition-all text-left relative',
-                                        isActive
-                                            ? 'bg-white shadow-lg shadow-slate-200/50 ring-1 ring-slate-100'
-                                            : 'hover:bg-slate-50',
-                                    ].join(' ')}
+                                    onClick={() => setShowCreate(true)}
+                                    className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors"
                                 >
-                                    {isActive && (
-                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 bg-blue-600 rounded-r-full" />
-                                    )}
-
-                                    {/* Avatar */}
-                                    <div className="relative shrink-0">
-                                        <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                                            <Image
-                                                src={chat.avatar}
-                                                alt={chat.name}
-                                                width={44}
-                                                height={44}
-                                                className="object-cover"
-                                            />
-                                        </div>
-                                        {chat.online && (
-                                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
-                                        )}
-                                    </div>
-
-                                    {/* Text */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <span className={`text-sm font-bold truncate ${isActive ? 'text-slate-900' : 'text-slate-700'}`}>
-                                                {chat.name}
-                                            </span>
-                                            <span className="text-[10px] font-semibold text-slate-400 shrink-0 ml-2">
-                                                {chat.time}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 mb-0.5">
-                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${ROLE_STYLES[chat.role]}`}>
-                                                {chat.role}
-                                            </span>
-                                            {chat.unread ? (
-                                                <span className="ml-auto bg-blue-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
-                                                    {chat.unread}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                        <p className="text-xs text-slate-400 truncate">{chat.lastMessage}</p>
-                                    </div>
+                                    + Create First Ticket
                                 </button>
-                            );
-                        })}
+                            </div>
+                        ) : (
+                            filtered.map((ticket) => {
+                                const isActive = selectedTicket?._id === ticket._id;
+                                const unread = unreadCount(ticket);
+                                const meta = STATUS_META[ticket.status];
+                                const lastMsg = ticket.messages[ticket.messages.length - 1];
+
+                                return (
+                                    <button
+                                        key={ticket._id}
+                                        onClick={() => { setSelectedTicket(ticket); setIsChatOpen(true); }}
+                                        className={[
+                                            'w-full flex items-start gap-3 p-4 text-left transition-all relative',
+                                            isActive ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent',
+                                        ].join(' ')}
+                                    >
+                                        {/* Avatar */}
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 mt-0.5">
+                                            {ticket.ngo ? (ticket.ngo.name?.[0]?.toUpperCase() ?? '?') : '?'}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between gap-2 mb-1">
+                                                <p className="font-bold text-sm text-slate-900 truncate">{ticket.subject}</p>
+                                                <span className="text-[10px] font-semibold text-slate-400 shrink-0 mt-0.5">
+                                                    {fmtTime(ticket.lastMessageAt)}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${meta.color}`}>
+                                                    {meta.icon} {meta.label}
+                                                </span>
+                                                {ticket.ngo && (
+                                                    <span className="text-[10px] text-slate-400 font-medium truncate">
+                                                        {ticket.ngo.name}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <p className="text-xs text-slate-400 truncate">
+                                                {lastMsg
+                                                    ? `${lastMsg.sender === myId ? 'You: ' : ''}${lastMsg.message}`
+                                                    : 'No messages yet'}
+                                            </p>
+                                        </div>
+
+                                        {unread > 0 && (
+                                            <span className="absolute top-4 right-4 w-5 h-5 bg-blue-600 text-white text-[10px] font-black rounded-full flex items-center justify-center">
+                                                {unread}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })
+                        )}
                     </div>
                 </aside>
 
-                {/* ─── RIGHT CHAT PANEL ────────────────────────────────── */}
-                <section
-                    className={[
-                        'flex flex-col bg-slate-50 min-w-0',
-                        /* mobile: full width, hidden unless chat open */
-                        'flex-1',
-                        isChatOpen ? 'flex' : 'hidden sm:flex',
-                    ].join(' ')}
-                >
-                    {/* Chat header */}
-                    <header className="h-16 sm:h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-3 sm:px-6 shrink-0 z-10">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            {/* Back button — mobile only */}
+                {/* ── RIGHT CHAT PANEL ──────────────────────────────────────── */}
+                <section className={[
+                    'flex-1 flex flex-col bg-slate-50 min-w-0',
+                    isChatOpen ? 'flex' : 'hidden sm:flex',
+                ].join(' ')}>
+
+                    {!selectedTicket ? (
+                        /* Empty state */
+                        <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center px-6">
+                            <div className="w-24 h-24 rounded-3xl bg-blue-50 flex items-center justify-center shadow-inner">
+                                <MessageCircle size={40} className="text-blue-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800 mb-2">Your Support Inbox</h2>
+                                <p className="text-sm text-slate-500 max-w-sm">
+                                    Select a ticket from the left to continue chatting, or create a new one to get help from our NGO team.
+                                </p>
+                            </div>
                             <button
-                                onClick={() => setIsChatOpen(false)}
-                                className="sm:hidden p-2 -ml-1 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
-                                aria-label="Back to conversations"
+                                onClick={() => setShowCreate(true)}
+                                className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
                             >
-                                <ChevronLeft size={22} />
-                            </button>
-
-                            <div className="relative shrink-0">
-                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-blue-50 shadow-sm">
-                                    <Image
-                                        src={selectedChat.avatar}
-                                        alt={selectedChat.name}
-                                        width={44}
-                                        height={44}
-                                        className="object-cover"
-                                    />
-                                </div>
-                                {selectedChat.online && (
-                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
-                                )}
-                            </div>
-
-                            <div className="min-w-0">
-                                <h2 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight truncate">
-                                    {selectedChat.name}
-                                </h2>
-                                <span className="text-[10px] font-bold text-green-500 uppercase tracking-wider">
-                                    Online now
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1">
-                            <button className="p-2 sm:p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
-                                <Phone size={18} className="sm:hidden" />
-                                <Video size={20} className="hidden sm:block" />
-                            </button>
-                            <button className="hidden sm:flex p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
-                                <Search size={20} />
-                            </button>
-                            <button className="p-2 sm:p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
-                                <MoreVertical size={20} />
+                                <Plus size={16} /> Create Support Ticket
                             </button>
                         </div>
-                    </header>
-
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-10 py-6 space-y-5">
-                        <div className="flex justify-center">
-                            <span className="px-4 py-1 rounded-full bg-slate-200/60 text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                                Today
-                            </span>
-                        </div>
-
-                        {(chatMessages[selectedChat.id] || []).map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`flex gap-2 sm:gap-3 ${msg.sender === 'me' ? 'flex-row-reverse' : ''}`}
-                            >
-                                {msg.sender === 'other' && (
-                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden shrink-0 self-end mb-5 shadow-sm border border-slate-200">
-                                        <Image
-                                            src={msg.avatar!}
-                                            alt=""
-                                            width={32}
-                                            height={32}
-                                            className="object-cover"
-                                        />
-                                    </div>
-                                )}
-                                <div
-                                    className={`flex flex-col max-w-[85%] sm:max-w-[72%] lg:max-w-[60%] ${msg.sender === 'me' ? 'items-end' : 'items-start'}`}
-                                >
-                                    <div
-                                        className={[
-                                            'px-4 sm:px-5 py-3 sm:py-4 rounded-[20px] text-sm leading-relaxed shadow-sm',
-                                            msg.sender === 'me'
-                                                ? 'bg-blue-600 text-white rounded-br-none shadow-blue-200'
-                                                : 'bg-white text-slate-700 rounded-bl-none shadow-slate-200',
-                                        ].join(' ')}
+                    ) : (
+                        <>
+                            {/* Chat Header */}
+                            <header className="h-16 sm:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setIsChatOpen(false)}
+                                        className="sm:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all"
                                     >
-                                        {msg.text}
+                                        <ChevronLeft size={22} />
+                                    </button>
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-sm">
+                                        {selectedTicket.ngo ? (selectedTicket.ngo.name?.[0]?.toUpperCase() ?? '?') : '?'}
                                     </div>
-                                    <div className="flex items-center gap-1.5 mt-1.5 px-1">
-                                        <span className="text-[10px] font-semibold text-slate-400">
-                                            {msg.time}
-                                        </span>
-                                        {msg.sender === 'me' && msg.status === 'read' && (
-                                            <CheckCheck size={13} className="text-blue-500" />
-                                        )}
+                                    <div className="min-w-0">
+                                        <h2 className="font-extrabold text-sm sm:text-base text-slate-900 truncate">
+                                            {selectedTicket.subject}
+                                        </h2>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_META[selectedTicket.status].color}`}>
+                                                {STATUS_META[selectedTicket.status].icon}
+                                                {STATUS_META[selectedTicket.status].label}
+                                            </span>
+                                            {selectedTicket.ngo && (
+                                                <span className="text-[10px] text-slate-400">
+                                                    Assigned to {selectedTicket.ngo.name}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-
-                        {/* Typing indicator */}
-                        <div className="flex items-center gap-2 pt-2">
-                            <div className="flex gap-1">
-                                {[0, 0.2, 0.4].map((delay, i) => (
-                                    <div
-                                        key={i}
-                                        className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce"
-                                        style={{ animationDelay: `${delay}s` }}
-                                    />
-                                ))}
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-400 italic">
-                                Dr. Jenkins is typing…
-                            </span>
-                        </div>
-
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Input area */}
-                    <div className="p-3 sm:p-5 bg-white border-t border-slate-100 shrink-0">
-                        <div className="flex items-center gap-2 sm:gap-3 max-w-4xl mx-auto">
-                            {/* Attachment / mic — hidden on very small screens to save space */}
-                            <button className="hidden xs:flex p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0">
-                                <Plus size={18} />
-                            </button>
-                            <button className="hidden sm:flex p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0">
-                                <Mic size={18} />
-                            </button>
-
-                            {/* Text input */}
-                            <div className="flex-1 relative">
-                                <input
-                                    type="text"
-                                    value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                    placeholder="Type your message…"
-                                    className="w-full pl-4 sm:pl-5 pr-11 py-3 sm:py-3.5 rounded-2xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-2 focus:ring-blue-50 outline-none text-sm font-medium transition-all"
-                                />
-                                <button className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors">
-                                    <Smile size={20} />
+                                <button
+                                    onClick={() => loadTickets()}
+                                    className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                                    title="Refresh"
+                                >
+                                    <Edit size={18} />
                                 </button>
+                            </header>
+
+                            {/* Messages */}
+                            <div className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-6 space-y-4">
+
+                                {/* Ticket info banner */}
+                                <div className="flex justify-center">
+                                    <div className="bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold px-4 py-2 rounded-full text-center max-w-sm">
+                                        Ticket created {new Date(selectedTicket.createdAt).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })}
+                                        {!selectedTicket.ngo && ' · Waiting for NGO to respond'}
+                                    </div>
+                                </div>
+
+                                {selectedTicket.messages.map((msg, i) => {
+                                    const isMe = msg.sender === myId;
+                                    const isNgo = msg.senderRole === 'ngo' || msg.senderRole === 'admin';
+                                    return (
+                                        <div key={msg._id ?? i} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                            {/* Avatar */}
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 self-end mb-5 shadow-sm ${isNgo ? 'bg-gradient-to-br from-emerald-500 to-emerald-700' : 'bg-gradient-to-br from-blue-500 to-blue-700'}`}>
+                                                {isMe ? initials : (isNgo ? (selectedTicket.ngo?.name?.[0]?.toUpperCase() ?? 'N') : (msg.senderName?.[0]?.toUpperCase() ?? 'U'))}
+                                            </div>
+
+                                            <div className={`flex flex-col max-w-[80%] sm:max-w-[68%] ${isMe ? 'items-end' : 'items-start'}`}>
+                                                {!isMe && (
+                                                    <span className="text-[10px] font-bold text-slate-400 mb-1 px-1">
+                                                        {isNgo ? `${msg.senderName} · NGO Support` : msg.senderName}
+                                                    </span>
+                                                )}
+                                                <div className={[
+                                                    'px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm',
+                                                    isMe
+                                                        ? 'bg-blue-600 text-white rounded-br-none'
+                                                        : isNgo
+                                                            ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-bl-none'
+                                                            : 'bg-white text-slate-700 rounded-bl-none border border-slate-100',
+                                                ].join(' ')}>
+                                                    {msg.message}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-1 px-1">
+                                                    <span className="text-[10px] text-slate-400 font-medium">{fmtTime(msg.timestamp)}</span>
+                                                    {isMe && <CheckCheck size={12} className="text-blue-400" />}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* Typing indicator bubble */}
+                                {typers.length > 0 && (
+                                    <div className="flex gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xs shrink-0 self-end">
+                                            {typers[0]?.name?.[0]?.toUpperCase() ?? '?'}
+                                        </div>
+                                        <div className="flex flex-col items-start">
+                                            <span className="text-[10px] font-bold text-slate-400 mb-1 px-1">
+                                                {typers[0]?.name ?? '...'} · {typers[0]?.role === 'ngo' || typers[0]?.role === 'admin' ? 'NGO Support' : 'Student'}
+                                            </span>
+                                            <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-slate-400" style={{ animation: 'bounce 1.2s infinite 0ms' }} />
+                                                <span className="w-2 h-2 rounded-full bg-slate-400" style={{ animation: 'bounce 1.2s infinite 200ms' }} />
+                                                <span className="w-2 h-2 rounded-full bg-slate-400" style={{ animation: 'bounce 1.2s infinite 400ms' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div ref={messagesEndRef} />
                             </div>
 
-                            {/* Send */}
-                            <button
-                                onClick={handleSend}
-                                className="p-3 sm:p-3.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all shrink-0"
-                            >
-                                <Send size={18} />
-                            </button>
-                        </div>
-
-                        {/* WCAG badge — desktop only */}
-                        <div className="hidden sm:flex justify-center mt-3">
-                            <span className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                    <path d="M12 2a5 5 0 0 0-5 5v2a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z" />
-                                    <path d="M19 13v-2" />
-                                    <path d="M5 13v-2" />
-                                </svg>
-                                WCAG 2.2 Compliant Interface
-                            </span>
-                        </div>
-                    </div>
+                            {/* Input area */}
+                            {selectedTicket.status !== 'closed' && selectedTicket.status !== 'resolved' ? (
+                                <div className="p-4 sm:p-5 bg-white border-t border-slate-100 shrink-0">
+                                    <div className="flex items-center gap-3 max-w-4xl mx-auto">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="text"
+                                                value={inputText}
+                                                onChange={handleInputChange}
+                                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                                                placeholder="Type a message…"
+                                                className="w-full pl-5 pr-4 py-3 sm:py-3.5 rounded-2xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-2 focus:ring-blue-50 outline-none text-sm font-medium transition-all"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleSend}
+                                            disabled={!inputText.trim() || sending}
+                                            className="p-3 sm:p-3.5 rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            {sending
+                                                ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                : <Send size={18} />
+                                            }
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-white border-t border-slate-100 text-center text-sm text-slate-400 font-medium">
+                                    This ticket is {selectedTicket.status}. Create a new ticket if you need further help.
+                                </div>
+                            )}
+                        </>
+                    )}
                 </section>
             </div>
         </DashboardLayout>

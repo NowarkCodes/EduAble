@@ -23,6 +23,12 @@ const LessonSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        // WebVTT file URL for sign language overlay (Phase 2)
+        // Each cue maps a timestamp range → word/phrase key looked up in SignVocabulary
+        signLanguageVttUrl: {
+            type: String,
+            default: '',
+        },
         // Cognitively simplified version of the lesson content
         simplifiedText: {
             type: String,

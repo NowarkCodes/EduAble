@@ -8,13 +8,13 @@ import Dropdown from '@/components/Dropdown';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import DashboardLayout, { NavItemType } from '@/components/DashboardLayout';
-import { LayoutDashboard, Video, Library, Settings, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Video, Library, Settings, BookOpen, MessageCircle, Send, ChevronLeft, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 export default function NgoDashboard() {
   const { user, loading, token } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'course-creation' | 'video-upload' | 'video-list' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'course-creation' | 'video-upload' | 'video-list' | 'settings' | 'messages'>('dashboard');
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -47,6 +47,167 @@ export default function NgoDashboard() {
   const [probedDuration, setProbedDuration] = useState<number | null>(null);
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
   const [courseCreationStatus, setCourseCreationStatus] = useState('');
+
+  /* ── Chat / Ticket state ───────────────────────────────────────────── */
+  interface ChatMessage {
+    _id: string;
+    sender: string;
+    senderName: string;
+    senderRole: string;
+    message: string;
+    timestamp: string;
+    isRead: boolean;
+  }
+  interface Ticket {
+    _id: string;
+    subject: string;
+    status: 'open' | 'in_progress' | 'resolved' | 'closed';
+    student: { _id: string; name: string; email: string };
+    ngo: { _id: string; name: string; email: string } | null;
+    messages: ChatMessage[];
+    lastMessageAt: string;
+    createdAt: string;
+  }
+
+  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const STATUS_META: Record<string, { label: string; color: string }> = {
+    open:        { label: 'Open',        color: 'bg-blue-100 text-blue-700' },
+    in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-700' },
+    resolved:    { label: 'Resolved',    color: 'bg-emerald-100 text-emerald-700' },
+    closed:      { label: 'Closed',      color: 'bg-slate-100 text-slate-500' },
+  };
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [mobileChat, setMobileChat] = useState(false);
+  const [ngoTypers, setNgoTypers] = useState<{ userId: string; name: string; role: string }[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const ngoTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadTickets = async () => {
+    if (!token) return;
+    setLoadingTickets(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tickets`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTickets(data.tickets || []);
+        if (selectedTicket) {
+          const updated = (data.tickets || []).find((t: Ticket) => t._id === selectedTicket._id);
+          if (updated) setSelectedTicket(updated);
+        }
+      }
+    } catch { /* non-fatal */ } finally { setLoadingTickets(false); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'messages') loadTickets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, token]);
+
+  useEffect(() => {
+    if (activeTab !== 'messages' || !selectedTicket) return;
+    const iv = setInterval(loadTickets, 5000);
+    // Poll typing every 2s
+    const typingIv = setInterval(async () => {
+      if (!token || !selectedTicket) return;
+      try {
+        const r = await fetch(`${BACKEND_URL}/api/tickets/${selectedTicket._id}/typing`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await r.json();
+        if (r.ok) setNgoTypers(d.typers || []);
+      } catch { /* non-fatal */ }
+    }, 2000);
+    return () => { clearInterval(iv); clearInterval(typingIv); setNgoTypers([]); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedTicket?._id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedTicket?.messages?.length, ngoTypers.length]);
+
+  const handleSendMsg = async () => {
+    if (!chatInput.trim() || !selectedTicket || !token) return;
+    const text = chatInput.trim();
+    setChatInput('');
+    setSendingMsg(true);
+    // Stop typing signal on send
+    if (ngoTypingTimeoutRef.current) clearTimeout(ngoTypingTimeoutRef.current);
+    fetch(`${BACKEND_URL}/api/tickets/${selectedTicket._id}/typing`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+    }).catch(() => {});
+    const tempId = `temp-${Date.now()}`;
+    const tempMsg: ChatMessage = {
+      _id: tempId,
+      sender: user?.id || '',
+      senderName: user?.name || 'NGO',
+      senderRole: 'ngo',
+      message: text,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+    };
+    setSelectedTicket(prev => prev ? { ...prev, messages: [...prev.messages, tempMsg] } : prev);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${selectedTicket._id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: text }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSelectedTicket(prev => prev ? {
+          ...prev,
+          messages: prev.messages.map(m => m._id === tempId ? data.message : m),
+          status: data.ticket.status,
+          ngo: data.ticket.ngo || prev.ngo,
+        } : prev);
+      }
+    } catch { /* non-fatal */ } finally { setSendingMsg(false); }
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!selectedTicket || !token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${selectedTicket._id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSelectedTicket(data.ticket);
+        setTickets(prev => prev.map(t => t._id === selectedTicket._id ? data.ticket : t));
+      }
+    } catch { /* non-fatal */ }
+  };
+
+  function fmtTime(iso: string) {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diff < 604800000) return d.toLocaleDateString([], { weekday: 'short' });
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  const handleChatInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setChatInput(e.target.value);
+    if (!token || !selectedTicket) return;
+    fetch(`${BACKEND_URL}/api/tickets/${selectedTicket._id}/typing`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }
+    }).catch(() => {});
+    if (ngoTypingTimeoutRef.current) clearTimeout(ngoTypingTimeoutRef.current);
+    ngoTypingTimeoutRef.current = setTimeout(() => {
+      if (!token || !selectedTicket) return;
+      fetch(`${BACKEND_URL}/api/tickets/${selectedTicket._id}/typing`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+    }, 2500);
+  };
 
   useEffect(() => {
     if (!loading && (!user || (user.role !== 'ngo' && user.role !== 'admin'))) {
@@ -237,11 +398,12 @@ export default function NgoDashboard() {
   const displayName = user?.name || 'NGO Partner';
 
   const ngoNavItems: NavItemType[] = [
-    { label: 'Dashboard', icon: LayoutDashboard, href: '#', isActive: activeTab === 'dashboard', onClick: () => setActiveTab('dashboard') },
-    { label: 'Create Course', icon: BookOpen, href: '#', isActive: activeTab === 'course-creation', onClick: () => setActiveTab('course-creation') },
-    { label: 'Video Upload', icon: Video, href: '#', isActive: activeTab === 'video-upload', onClick: () => setActiveTab('video-upload') },
-    { label: 'Video Library', icon: Library, href: '#', isActive: activeTab === 'video-list', onClick: () => setActiveTab('video-list') },
-    { label: 'Settings', icon: Settings, href: '#', isActive: activeTab === 'settings', onClick: () => setActiveTab('settings') },
+    { label: 'Dashboard',      icon: LayoutDashboard, href: '#', isActive: activeTab === 'dashboard',       onClick: () => setActiveTab('dashboard') },
+    { label: 'Create Course',  icon: BookOpen,        href: '#', isActive: activeTab === 'course-creation', onClick: () => setActiveTab('course-creation') },
+    { label: 'Video Upload',   icon: Video,           href: '#', isActive: activeTab === 'video-upload',    onClick: () => setActiveTab('video-upload') },
+    { label: 'Video Library',  icon: Library,         href: '#', isActive: activeTab === 'video-list',      onClick: () => setActiveTab('video-list') },
+    { label: 'Student Messages', icon: MessageCircle, href: '#', isActive: activeTab === 'messages',        onClick: () => setActiveTab('messages') },
+    { label: 'Settings',       icon: Settings,        href: '#', isActive: activeTab === 'settings',        onClick: () => setActiveTab('settings') },
   ];
 
   // Tab label for mobile header
@@ -707,6 +869,228 @@ export default function NgoDashboard() {
             )}
           </section>
         )}
+        {/* ── Messages Tab ────────────────────────────────────────────── */}
+        {activeTab === 'messages' && (
+          <section className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(112,144,176,0.08)] overflow-hidden flex flex-col" style={{ minHeight: '70vh' }}>
+            <div className="flex flex-1 overflow-hidden" style={{ minHeight: '70vh' }}>
+
+              {/* Left: Ticket List */}
+              <div className={`w-full sm:w-[320px] border-r border-[#e0e5f2] flex flex-col ${mobileChat ? 'hidden sm:flex' : 'flex'}`}>
+                <div className="p-4 sm:p-5 border-b border-[#e0e5f2]">
+                  <h2 className="text-lg font-bold text-[#2b3674] flex items-center gap-2">
+                    <MessageCircle size={20} className="text-[#1a56db]" /> Student Tickets
+                  </h2>
+                  <p className="text-xs text-[#a3aed1] mt-0.5">Reply to student support queries</p>
+                </div>
+                <div className="flex-1 overflow-y-auto divide-y divide-[#f4f7fe]">
+                  {loadingTickets ? (
+                    <div className="py-12 flex flex-col items-center gap-3 text-[#a3aed1]">
+                      <div className="w-8 h-8 border-4 border-[#e0e5f2] border-t-[#1a56db] rounded-full animate-spin" />
+                      <p className="text-sm">Loading tickets…</p>
+                    </div>
+                  ) : tickets.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center gap-3 px-6 text-center">
+                      <MessageCircle size={32} className="text-[#e0e5f2]" />
+                      <p className="text-sm text-[#a3aed1] font-medium">No student tickets yet</p>
+                    </div>
+                  ) : tickets.map((ticket) => {
+                    const isActive = selectedTicket?._id === ticket._id;
+                    const meta = STATUS_META[ticket.status];
+                    const lastMsg = ticket.messages[ticket.messages.length - 1];
+                    const unread = ticket.messages.filter((m: any) => m.senderRole === 'student' && !m.isRead).length;
+                    return (
+                      <button
+                        key={ticket._id}
+                        onClick={() => { setSelectedTicket(ticket); setMobileChat(true); }}
+                        className={`w-full flex items-start gap-3 p-4 text-left transition-all border-l-4 ${
+                          isActive ? 'bg-[#f4f7fe] border-l-[#1a56db]' : 'hover:bg-[#f4f7fe] border-l-transparent'
+                        }`}
+                      >
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1a56db] to-[#0ea5e9] flex items-center justify-center text-white font-bold text-xs shrink-0 mt-0.5">
+                          {ticket.student.name?.[0]?.toUpperCase() ?? '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1 mb-1">
+                            <p className="text-sm font-bold text-[#2b3674] truncate">{ticket.subject}</p>
+                            <span className="text-[10px] text-[#a3aed1] shrink-0">{fmtTime(ticket.lastMessageAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${meta.color}`}>{meta.label}</span>
+                            <span className="text-[10px] text-[#a3aed1] truncate">{ticket.student.name}</span>
+                          </div>
+                          {lastMsg && (
+                            <p className="text-xs text-[#a3aed1] truncate">{lastMsg.message}</p>
+                          )}
+                        </div>
+                        {unread > 0 && (
+                          <span className="w-5 h-5 bg-[#1a56db] text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0">
+                            {unread}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right: Chat Panel */}
+              <div className={`flex-1 flex flex-col min-w-0 ${mobileChat ? 'flex' : 'hidden sm:flex'}`}>
+
+                {!selectedTicket ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
+                    <div className="w-20 h-20 rounded-2xl bg-[#f4f7fe] flex items-center justify-center">
+                      <MessageCircle size={36} className="text-[#1a56db]/40" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#2b3674] mb-1">Select a ticket</p>
+                      <p className="text-sm text-[#a3aed1]">Choose a student ticket from the left to start chatting</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Chat Header */}
+                    <div className="h-16 sm:h-[72px] bg-white border-b border-[#e0e5f2] flex items-center justify-between px-4 sm:px-6 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setMobileChat(false)} className="sm:hidden p-2 rounded-xl text-[#a3aed1] hover:bg-[#f4f7fe]">
+                          <ChevronLeft size={20} />
+                        </button>
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1a56db] to-[#0ea5e9] flex items-center justify-center text-white font-bold text-sm">
+                          {selectedTicket.student.name?.[0]?.toUpperCase() ?? '?'}
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#2b3674] text-sm">{selectedTicket.student.name}</p>
+                          <p className="text-xs text-[#a3aed1] truncate max-w-[200px]">{selectedTicket.subject}</p>
+                        </div>
+                      </div>
+                      {/* Status changer */}
+                      <div className="flex items-center gap-2">
+                        {selectedTicket.status !== 'resolved' && selectedTicket.status !== 'closed' && (
+                          <button
+                            onClick={() => handleUpdateStatus('resolved')}
+                            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#f0fdf4] text-[#16a34a] text-xs font-bold rounded-xl border border-[#bbf7d0] hover:bg-[#dcfce7] transition-colors"
+                          >
+                            <CheckCircle size={13} /> Mark Resolved
+                          </button>
+                        )}
+                        <span className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${STATUS_META[selectedTicket.status].color}`}>
+                          {selectedTicket.status === 'open' && <Clock size={11} />}
+                          {selectedTicket.status === 'in_progress' && <AlertCircle size={11} />}
+                          {selectedTicket.status === 'resolved' && <CheckCircle size={11} />}
+                          {selectedTicket.status === 'closed' && <XCircle size={11} />}
+                          {STATUS_META[selectedTicket.status].label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5 space-y-4 bg-[#f4f7fe]">
+                      <div className="flex justify-center mb-2">
+                        <span className="bg-white text-[#a3aed1] text-[10px] font-bold px-4 py-1.5 rounded-full border border-[#e0e5f2]">
+                          Ticket opened {new Date(selectedTicket.createdAt).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+
+                      {selectedTicket.messages.map((msg: any, i: number) => {
+                        const isMe = msg.senderRole === 'ngo' || msg.senderRole === 'admin';
+                        return (
+                          <div key={msg._id ?? i} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 self-end mb-5 ${
+                              isMe ? 'bg-gradient-to-br from-[#1a56db] to-[#0ea5e9]' : 'bg-gradient-to-br from-[#a3aed1] to-[#8592b0]'
+                            }`}>
+                              {isMe ? (user?.name?.[0]?.toUpperCase() ?? 'N') : (selectedTicket.student.name?.[0]?.toUpperCase() ?? '?')}
+                            </div>
+                            <div className={`flex flex-col max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                              {!isMe && (
+                                <span className="text-[10px] font-bold text-[#a3aed1] mb-1 px-1">{msg.senderName} · Student</span>
+                              )}
+                              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                                isMe
+                                  ? 'bg-gradient-to-br from-[#1a56db] to-[#0ea5e9] text-white rounded-br-none'
+                                  : 'bg-white text-[#2b3674] rounded-bl-none border border-[#e0e5f2]'
+                              }`}>
+                                {msg.message}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1 px-1">
+                                <span className="text-[10px] text-[#a3aed1] font-medium">{fmtTime(msg.timestamp)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Typing indicator bubble */}
+                      {ngoTypers.length > 0 && (
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#a3aed1] to-[#8592b0] flex items-center justify-center text-white font-bold text-xs shrink-0 self-end">
+                            {ngoTypers[0]?.name?.[0]?.toUpperCase() ?? '?'}
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="text-[10px] font-bold text-[#a3aed1] mb-1 px-1">
+                              {ngoTypers[0]?.name ?? '...'} &middot; {ngoTypers[0]?.role === 'student' ? 'Student' : 'NGO'}
+                            </span>
+                            <div className="bg-white rounded-2xl rounded-bl-none px-4 py-3 border border-[#e0e5f2] shadow-sm flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#a3aed1]" style={{ animation: 'bounce 1.2s infinite 0ms' }} />
+                              <span className="w-2 h-2 rounded-full bg-[#a3aed1]" style={{ animation: 'bounce 1.2s infinite 200ms' }} />
+                              <span className="w-2 h-2 rounded-full bg-[#a3aed1]" style={{ animation: 'bounce 1.2s infinite 400ms' }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Input */}
+                    {selectedTicket.status !== 'closed' && selectedTicket.status !== 'resolved' ? (
+                      <div className="p-4 bg-white border-t border-[#e0e5f2] shrink-0">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="text"
+                            value={chatInput}
+                            onChange={handleChatInput}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMsg()}
+                            placeholder="Reply to student…"
+                            className="flex-1 px-4 py-3 rounded-xl bg-[#f4f7fe] border border-transparent focus:bg-white focus:border-[#1a56db] outline-none text-sm font-medium transition-all"
+                          />
+                          <button
+                            onClick={handleSendMsg}
+                            disabled={!chatInput.trim() || sendingMsg}
+                            className="p-3 rounded-xl bg-[#1a56db] text-white hover:bg-[#1a56db]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          >
+                            {sendingMsg
+                              ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              : <Send size={18} />
+                            }
+                          </button>
+                        </div>
+                        <div className="flex justify-between items-center mt-3">
+                          <button
+                            onClick={() => handleUpdateStatus('resolved')}
+                            className="sm:hidden flex items-center gap-1 text-xs font-bold text-[#16a34a] bg-[#f0fdf4] px-3 py-1.5 rounded-xl border border-[#bbf7d0]"
+                          >
+                            <CheckCircle size={12} /> Mark Resolved
+                          </button>
+                          <button
+                            onClick={() => handleUpdateStatus('closed')}
+                            className="flex items-center gap-1 text-xs font-bold text-[#a3aed1] hover:text-[#dc2626] transition-colors ml-auto"
+                          >
+                            <XCircle size={12} /> Close Ticket
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-white border-t border-[#e0e5f2] text-center text-sm text-[#a3aed1] font-medium">
+                        This ticket is {selectedTicket.status}.
+                        <button onClick={() => handleUpdateStatus('open')} className="ml-2 text-[#1a56db] hover:underline font-bold">Reopen</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
       </main>
     </DashboardLayout>
   );
