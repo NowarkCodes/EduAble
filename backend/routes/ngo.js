@@ -56,29 +56,51 @@ router.post('/upload-urls', async (req, res) => {
     const cloudVideoName = `uploads/videos/${uniquePrefix}-${videoFileName}`;
     const cloudAudioName = `uploads/audio/${uniquePrefix}-${audioFileName}`;
 
-    const config = {
+    const cloudTranscriptName = `uploads/transcripts/${uniquePrefix}-transcript.txt`;
+
+    const videoConfig = {
       version: 'v4',
       action: 'write',
       expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
-      extensionHeaders: req.body.duration ? { 'x-goog-meta-duration': String(req.body.duration) } : undefined,
+    };
+
+    const audioConfig = {
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 15 * 60 * 1000,
     };
 
     // Generate secure upload URLs directly from Google
     const [videoUrl] = await storage.bucket(uploadBucket).file(cloudVideoName).getSignedUrl({
-      ...config,
+      ...videoConfig,
       contentType: videoType || 'video/mp4',
     });
 
     const [audioUrl] = await storage.bucket(uploadBucket).file(cloudAudioName).getSignedUrl({
-      ...config,
+      ...audioConfig,
       contentType: audioType || 'audio/mp3',
     });
+
+    let transcriptUrl = null;
+    if (req.body.hasTranscript) {
+      const transConfig = {
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 15 * 60 * 1000,
+      };
+      [transcriptUrl] = await storage.bucket(uploadBucket).file(cloudTranscriptName).getSignedUrl({
+        ...transConfig,
+        contentType: 'text/plain',
+      });
+    }
 
     res.json({
       videoUrl,
       audioUrl,
+      transcriptUrl,
       cloudVideoName,
-      cloudAudioName
+      cloudAudioName,
+      cloudTranscriptName
     });
 
   } catch (err) {
@@ -101,12 +123,23 @@ async function getSignedReadUrl(filePath) {
 router.get('/videos', async (req, res) => {
   try {
     const [files] = await storage.bucket(uploadBucket).getFiles({ prefix: 'uploads/videos/' });
-
+    const [transcriptFiles] = await storage.bucket(uploadBucket).getFiles({ prefix: 'uploads/transcripts/' });
+    
+    const transcriptSet = new Set(transcriptFiles.map(f => f.name));
 
     const videoPromises = files
       .filter(file => file.name !== 'uploads/videos/') // skip folder entry
       .map(async file => {
         const signedUrl = await getSignedReadUrl(file.name);
+        
+        // Infer transcript path from video file name prefix
+        const parts = file.name.replace('uploads/videos/', '').split('-');
+        let expectedTranscriptPath = null;
+        if (parts.length >= 2) {
+            const uniquePrefix = parts[0] + '-' + parts[1];
+            expectedTranscriptPath = `uploads/transcripts/${uniquePrefix}-transcript.txt`;
+        }
+        
         return {
           name: file.name.replace('uploads/videos/', ''),
           cloudPath: file.name,
@@ -114,6 +147,7 @@ router.get('/videos', async (req, res) => {
           size: file.metadata.size,
           updated: file.metadata.updated,
           duration: file.metadata.metadata?.duration ? parseInt(file.metadata.metadata.duration) : 0,
+          transcriptPath: (expectedTranscriptPath && transcriptSet.has(expectedTranscriptPath)) ? expectedTranscriptPath : null,
         };
       });
 
@@ -193,16 +227,28 @@ router.post('/courses', authMiddleware, requireRole('admin', 'ngo'), async (req,
       }
     };
 
-    const lessonDocs = videos.map((v, index) => ({
-      courseId: newCourse._id,
-      title: v.name || `Lesson ${index + 1}`,
-      videoUrl: v.cloudPath
-        ? `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${v.cloudPath}`
-        : toPermanentUrl(v.url),
-      order: index + 1,
-      duration: v.duration || 0,
-      transcript: '',
-      simplifiedText: '',
+    const lessonDocs = await Promise.all(videos.map(async (v, index) => {
+      let transcriptText = '';
+      if (v.transcriptPath) {
+        try {
+          const [fileContents] = await storage.bucket(uploadBucket).file(v.transcriptPath).download();
+          transcriptText = fileContents.toString('utf-8');
+        } catch (e) {
+          console.error('[ngo/courses] Failed to download transcript from GCS:', e);
+        }
+      }
+
+      return {
+        courseId: newCourse._id,
+        title: v.name || `Lesson ${index + 1}`,
+        videoUrl: v.cloudPath
+          ? `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${v.cloudPath}`
+          : toPermanentUrl(v.url),
+        order: index + 1,
+        duration: v.duration || 0,
+        transcript: transcriptText,
+        simplifiedText: '',
+      };
     }));
 
     await Lesson.insertMany(lessonDocs);

@@ -44,7 +44,7 @@ export default function Dropdown({
         typeof opt === 'string' ? { label: opt, value: opt } : opt
     );
 
-    const selectedOption = normalizedOptions.find(opt => opt.value === value) || (value ? undefined : normalizedOptions[0]);
+    const selectedOption = normalizedOptions.find(opt => opt.value === value);
 
     return (
         <div className={`relative ${className}`} ref={containerRef}>

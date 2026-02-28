@@ -26,6 +26,7 @@ export default function NgoDashboard() {
   const [videoSubject, setVideoSubject] = useState('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [conversionProgress, setConversionProgress] = useState(0);
@@ -34,6 +35,7 @@ export default function NgoDashboard() {
   const [cloudVideos, setCloudVideos] = useState<any[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const transcriptInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<any>(null);
 
   const [courseForm, setCourseForm] = useState({
@@ -305,20 +307,26 @@ export default function NgoDashboard() {
           videoFileName: videoFile.name, audioFileName: finalName,
           videoType: videoFile.type || 'video/mp4', audioType: 'audio/mp3',
           duration: probedDuration,
+          hasTranscript: !!transcriptFile,
         }),
       });
       if (!presignedRes.ok) throw new Error('Failed to generate secure Google Cloud upload URLs');
-      const { videoUrl, audioUrl } = await presignedRes.json();
+      const { videoUrl, audioUrl, transcriptUrl, cloudTranscriptName } = await presignedRes.json();
 
-      setUploadStatus(`Step 3: Direct Cloud Uploading (Bypassing Server)... Sending Video & Audio in parallel to GCS.`);
+      setUploadStatus(`Step 3: Direct Cloud Uploading (Bypassing Server)... Sending files in parallel to GCS.`);
       const videoHeaders: any = { 'Content-Type': videoFile.type || 'video/mp4' };
-      if (probedDuration) videoHeaders['x-goog-meta-duration'] = String(probedDuration);
 
-      const [videoUploadRes, audioUploadRes] = await Promise.all([
+      const uploadPromises = [
         fetch(videoUrl, { method: 'PUT', body: videoFile, headers: videoHeaders }),
         fetch(audioUrl, { method: 'PUT', body: extractedAudio, headers: { 'Content-Type': 'audio/mp3' } }),
-      ]);
-      if (!videoUploadRes.ok || !audioUploadRes.ok) throw new Error('Failed to stream files to Google Cloud Storage.');
+      ];
+
+      if (transcriptFile && transcriptUrl) {
+        uploadPromises.push(fetch(transcriptUrl, { method: 'PUT', body: transcriptFile, headers: { 'Content-Type': 'text/plain' } }));
+      }
+
+      const uploadResults = await Promise.all(uploadPromises);
+      if (uploadResults.some(res => !res.ok)) throw new Error('Failed to stream files to Google Cloud Storage.');
 
       setUploadStatus('✅ Upload Complete! AI Whisper model triggered.');
       setIsUploadSuccess(true);
@@ -592,7 +600,7 @@ export default function NgoDashboard() {
                               className={`p-2.5 sm:p-3 rounded-lg border flex items-center justify-between cursor-pointer transition-colors ${isSelected ? 'border-[#1a56db] bg-[#1a56db]/5' : 'border-transparent bg-white hover:border-[#e0e5f2]'}`}
                               onClick={() => {
                                 if (isSelected) setSelectedVideos(selectedVideos.filter(v => v.url !== video.url));
-                                else setSelectedVideos([...selectedVideos, { name: displayTitle, url: video.url, cloudPath: video.cloudPath, duration: video.duration || 0 }]);
+                                else setSelectedVideos([...selectedVideos, { name: displayTitle, url: video.url, cloudPath: video.cloudPath, duration: video.duration || 0, transcriptPath: video.transcriptPath || '' }]);
                               }}
                             >
                               <div className="flex items-center gap-3 min-w-0">
@@ -694,6 +702,25 @@ export default function NgoDashboard() {
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-[#2b3674] text-sm">Transcript File (.txt, .srt) (Optional)</label>
+                    <input type="file" accept=".txt,.srt" className="hidden" ref={transcriptInputRef} onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setTranscriptFile(e.target.files[0]);
+                      }
+                    }} />
+                    <div
+                      className={`border-2 border-dashed ${transcriptFile ? 'border-[#05cd99] bg-[#05cd99]/5' : 'border-[#1a56db] bg-[#1a56db]/[0.03]'} rounded-2xl p-4 sm:p-5 lg:p-6 text-center cursor-pointer transition-all duration-200 hover:bg-[#1a56db]/[0.06] hover:-translate-y-0.5`}
+                      role="button" tabIndex={0}
+                      onClick={() => transcriptInputRef.current?.click()}
+                    >
+                      <span className="text-2xl sm:text-3xl mb-2 inline-block" aria-hidden="true">{transcriptFile ? '📄' : '📝'}</span>
+                      <div className="text-[#2b3674] font-semibold mb-1 text-xs sm:text-sm break-all">
+                        {transcriptFile ? transcriptFile.name : 'Click to select a transcript file (.txt / .srt)'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
                     <label className="font-semibold text-[#2b3674] text-sm">Accessibility Options (Auto-generated)</label>
                     <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 mt-1 text-[#2b3674] text-sm">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -778,6 +805,7 @@ export default function NgoDashboard() {
                     onClick={() => {
                       setIsUploadSuccess(false);
                       setVideoFile(null); setAudioFile(null);
+                      setTranscriptFile(null);
                       setUploadStatus(''); setDownloadableAudio(null);
                       setConversionProgress(0);
                     }}
