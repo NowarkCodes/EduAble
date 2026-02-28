@@ -45,6 +45,10 @@ function questionsFor(disability: DisabilityKey | null): Question[] {
         q.push(
             { key: 'captionSize', label: 'Caption size preference?', type: 'select', options: ['small', 'medium', 'large'] },
             { key: 'signLanguageSupport', label: 'Require sign language support?', type: 'boolean' },
+            // Phase 3 — sign language overlay + gesture nav preferences
+            { key: 'preferredSignLanguage', label: 'Preferred sign language variant?', type: 'select', options: ['ISL', 'ASL', 'none'] },
+            { key: 'gestureNavigationEnabled', label: 'Enable gesture-based navigation (uses webcam)?', type: 'boolean' },
+            { key: 'signOverlayPosition', label: 'Sign overlay position on screen?', type: 'select', options: ['bottom-left', 'top-left', 'floating'] },
         );
     }
     if (disability === 'motor_disability') {

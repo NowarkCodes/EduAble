@@ -44,6 +44,22 @@ const AccessibilityProfileSchema = new mongoose.Schema(
       captionSize: { type: String, default: 'medium' },
       signLanguageSupport: { type: Boolean, default: false },
 
+      // Sign language overlay + gesture navigation (Phase 2 / 3)
+      preferredSignLanguage: {
+        type: String,
+        enum: ['ISL', 'ASL', 'none'],
+        default: 'none',
+      },
+      gestureNavigationEnabled: {
+        type: Boolean,
+        default: false,
+      },
+      signOverlayPosition: {
+        type: String,
+        enum: ['top-left', 'bottom-left', 'floating'],
+        default: 'bottom-left',
+      },
+
       // Motor Disability
       keyboardOnlyNavigation: { type: Boolean, default: false },
       voiceCommands: { type: Boolean, default: false },

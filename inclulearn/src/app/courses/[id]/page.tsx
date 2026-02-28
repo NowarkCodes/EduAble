@@ -5,6 +5,13 @@ import { useParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import type { GestureId } from '@/components/GestureEngine';
+
+// ─── Gesture & Sign Language — lazy-loaded (code-split, zero cost when unused)
+const GestureEngine = dynamic(() => import('@/components/GestureEngine'), { ssr: false });
+const GestureHUD = dynamic(() => import('@/components/GestureHUD'), { ssr: false });
+const SignOverlayPlayer = dynamic(() => import('@/components/SignOverlayPlayer'), { ssr: false });
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -19,6 +26,20 @@ interface Lesson {
     notesMarkdown?: string;
     completed?: boolean;
     transcript?: string;
+    signLanguageVttUrl?: string;
+}
+
+interface AccessibilityPreferences {
+    signLanguageSupport: boolean;
+    gestureNavigationEnabled: boolean;
+    preferredSignLanguage: 'ISL' | 'ASL' | 'none';
+    signOverlayPosition: 'top-left' | 'bottom-left' | 'floating';
+    captionSize: string;
+    [key: string]: unknown;
+}
+
+interface AccessibilityProfile {
+    accessibilityPreferences: AccessibilityPreferences;
 }
 
 interface CourseData {
@@ -162,6 +183,15 @@ export default function CourseDetailPage() {
 
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    // ── Accessibility / Gesture / Sign Language state ─────────────────────────
+    const [accessibilityProfile, setAccessibilityProfile] = useState<AccessibilityProfile | null>(null);
+    const [gestureEnabled, setGestureEnabled] = useState(false);
+    const [activeGesture, setActiveGesture] = useState<GestureId | null>(null);
+    const gestureStreamRef = useRef<MediaStream | null>(null);
+    const [
+        , setCaptionsVisible
+    ] = useState(true); // mirrors caption track state
+
     // ── Fetch course + lessons ────────────────────────────────────────────────
 
     const fetchCourse = useCallback(async () => {
@@ -197,6 +227,24 @@ export default function CourseDetailPage() {
     }, [token, id]);
 
     useEffect(() => { fetchCourse(); }, [fetchCourse]);
+
+    // ── Fetch accessibility profile ──────────────────────────────────────────
+    useEffect(() => {
+        if (!token) return;
+        fetch(`${BACKEND}/api/profile/accessibility`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                setAccessibilityProfile(data);
+                // Hydrate gesture-nav flag from saved profile
+                if (data?.accessibilityPreferences?.gestureNavigationEnabled) {
+                    setGestureEnabled(true);
+                }
+            })
+            .catch(() => null);
+    }, [token]);
 
     // ── Auto-enroll ───────────────────────────────────────────────────────────
 
@@ -318,11 +366,55 @@ export default function CourseDetailPage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // ── Gesture handler — wired to existing controls ────────────────────────
+    const handleGesture = useCallback((id: GestureId) => {
+        setActiveGesture(id);
+        // Clear label after 2 s
+        setTimeout(() => setActiveGesture(null), 2000);
+
+        switch (id) {
+            case 'play_pause':
+                if (videoRef.current) {
+                    if (videoRef.current.paused) videoRef.current.play().catch(() => null);
+                    else videoRef.current.pause();
+                }
+                break;
+            case 'next_lesson':
+                if (hasNext) goToLesson(currentLessonIdx + 1);
+                break;
+            case 'prev_lesson':
+                if (hasPrev) goToLesson(currentLessonIdx - 1);
+                break;
+            case 'toggle_captions':
+                setCaptionsVisible(prev => {
+                    const track = videoRef.current?.textTracks[0];
+                    if (track) track.mode = prev ? 'hidden' : 'showing';
+                    return !prev;
+                });
+                break;
+            case 'raise_hand':
+                // Announce via screen-reader live region (non-intrusive)
+                if (typeof window !== 'undefined') {
+                    const el = document.getElementById('gesture-sr-announce');
+                    if (el) el.textContent = 'Hand raised — educator notified.';
+                }
+                break;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasNext, hasPrev, currentLessonIdx]);
+
     const calculatedTotalDuration = Math.round(lessons.reduce((acc, l) => acc + (l.duration || 0), 0) / 60);
+
+    // ── Derived sign overlay prefs ────────────────────────────────────────────
+    const signPrefs = accessibilityProfile?.accessibilityPreferences;
+    const showSignOverlay =
+        signPrefs?.signLanguageSupport === true &&
+        signPrefs?.preferredSignLanguage !== 'none' &&
+        !!currentLesson?.signLanguageVttUrl;
 
     // ─── Render ───────────────────────────────────────────────────────────────
 
-    return (
+    return (<>
         <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 md:py-8">
 
@@ -666,5 +758,50 @@ export default function CourseDetailPage() {
                 </div>
             </footer>
         </DashboardLayout>
-    );
+
+        {/* ── Screen-reader live region for gesture announcements ─────────── */}
+        <div
+            id="gesture-sr-announce"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="sr-only"
+        />
+
+        {/* ── Gesture Engine (headless, zero render cost when disabled) ────── */}
+        {
+            gestureEnabled && (
+                <GestureEngine
+                    onGesture={handleGesture}
+                    cooldownMs={1500}
+                />
+            )
+        }
+
+        {/* ── Gesture HUD ──────────────────────────────────────────────────── */}
+        {
+            signPrefs?.gestureNavigationEnabled && (
+                <GestureHUD
+                    activeGesture={activeGesture}
+                    enabled={gestureEnabled}
+                    onToggle={() => setGestureEnabled(prev => !prev)}
+                    stream={gestureStreamRef.current}
+                />
+            )
+        }
+
+        {/* ── Sign Language Overlay ────────────────────────────────────────── */}
+        {
+            showSignOverlay && (
+                <SignOverlayPlayer
+                    mainVideoRef={videoRef}
+                    vttUrl={currentLesson!.signLanguageVttUrl!}
+                    preferredLanguage={signPrefs!.preferredSignLanguage as 'ISL' | 'ASL'}
+                    position={signPrefs!.signOverlayPosition as 'top-left' | 'bottom-left' | 'floating'}
+                    backendUrl={BACKEND}
+                    token={token}
+                />
+            )
+        }
+    </>);
 }

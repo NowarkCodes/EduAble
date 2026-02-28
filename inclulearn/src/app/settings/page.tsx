@@ -181,6 +181,180 @@ const shortcuts = [
   },
 ];
 
+/* ── Sign Language & Gesture Navigation Settings ──────────────────────────── */
+function SignLanguageSection() {
+  const { token } = useAuth();
+  const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+  const [signLangSupport, setSignLangSupport] = React.useState(false);
+  const [gestureNav, setGestureNav] = React.useState(false);
+  const [preferredLang, setPreferredLang] = React.useState('ISL');
+  const [overlayPos, setOverlayPos] = React.useState('bottom-left');
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  // Load existing prefs
+  React.useEffect(() => {
+    if (!token) return;
+    fetch(`${BACKEND}/api/profile/accessibility`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.accessibilityPreferences) return;
+        const p = data.accessibilityPreferences;
+        setSignLangSupport(!!p.signLanguageSupport);
+        setGestureNav(!!p.gestureNavigationEnabled);
+        setPreferredLang(p.preferredSignLanguage || 'ISL');
+        setOverlayPos(p.signOverlayPosition || 'bottom-left');
+      })
+      .catch(() => null);
+  }, [token, BACKEND]);
+
+  async function save() {
+    if (!token) return;
+    setSaving(true);
+    try {
+      await fetch(`${BACKEND}/api/profile/accessibility`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          accessibilityPreferences: {
+            signLanguageSupport: signLangSupport,
+            gestureNavigationEnabled: gestureNav,
+            preferredSignLanguage: preferredLang,
+            signOverlayPosition: overlayPos,
+          },
+        }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* non-fatal */ } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-[16px] border border-slate-200 overflow-hidden shadow-sm w-full" id="sign-language-settings">
+      <div className="p-5 sm:p-6 md:p-8">
+        <div className="flex items-center gap-3 mb-5 sm:mb-6">
+          <div className="text-teal-600 bg-teal-50 rounded-md p-1.5 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M6 14l-.6-1.4A3 3 0 0 0 3 11v0a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-1a2 2 0 0 0-2-2v0" />
+            </svg>
+          </div>
+          <h2 className="text-base sm:text-lg lg:text-xl font-black tracking-wide text-slate-900" id="sign-lang-heading">
+            Sign Language &amp; Gesture Navigation
+          </h2>
+        </div>
+
+        <div className="space-y-4">
+          {/* Sign language overlay toggle */}
+          <ToggleCard
+            id="setting-sign-lang-support"
+            checked={signLangSupport}
+            onChange={setSignLangSupport}
+            label="Sign Language Overlay"
+            description="Shows an ISL/ASL video overlay synced to lesson audio for deaf students."
+            badge="Deaf Support"
+          />
+
+          {signLangSupport && (
+            <>
+              {/* ISL / ASL picker */}
+              <div className="p-4 sm:p-5 bg-slate-50 rounded-xl border border-slate-100">
+                <label htmlFor="setting-preferred-lang" className="text-sm font-bold text-slate-900 block mb-1">
+                  Preferred Sign Language
+                </label>
+                <p className="text-xs text-slate-500 mb-3">ISL = Indian Sign Language · ASL = American Sign Language</p>
+                <div className="flex gap-2" role="radiogroup" aria-labelledby="setting-preferred-lang">
+                  {(['ISL', 'ASL', 'none'] as const).map(l => (
+                    <label
+                      key={l}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer text-sm font-bold transition-colors ${preferredLang === l ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-600 hover:border-teal-300'
+                        }`}
+                    >
+                      <input
+                        type="radio"
+                        name="preferred-sign-lang"
+                        value={l}
+                        checked={preferredLang === l}
+                        onChange={() => setPreferredLang(l)}
+                        className="accent-teal-600"
+                      />
+                      {l === 'none' ? 'None' : l}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Overlay position */}
+              <div className="p-4 sm:p-5 bg-slate-50 rounded-xl border border-slate-100">
+                <label htmlFor="setting-overlay-pos" className="text-sm font-bold text-slate-900 block mb-1">
+                  Overlay Position
+                </label>
+                <p className="text-xs text-slate-500 mb-3">Where the sign language clip appears on the lesson screen.</p>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Overlay position">
+                  {(['bottom-left', 'top-left', 'floating'] as const).map(pos => (
+                    <label
+                      key={pos}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer text-sm font-medium transition-colors ${overlayPos === pos ? 'border-teal-600 bg-teal-50 text-teal-700 font-bold' : 'border-slate-200 text-slate-600 hover:border-teal-300'
+                        }`}
+                    >
+                      <input
+                        type="radio"
+                        name="overlay-position"
+                        value={pos}
+                        checked={overlayPos === pos}
+                        onChange={() => setOverlayPos(pos)}
+                        className="accent-teal-600"
+                      />
+                      {pos.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Gesture navigation toggle */}
+          <ToggleCard
+            id="setting-gesture-nav"
+            checked={gestureNav}
+            onChange={setGestureNav}
+            label="Gesture-Based Navigation"
+            description="Use hand signs via webcam to control lesson playback (play/pause, next/prev). Requires camera permission."
+          />
+
+          {/* Save button */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={save}
+              disabled={saving}
+              aria-busy={saving}
+              style={{ minHeight: 44 }}
+              className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-60"
+            >
+              {saving ? 'Saving…' : 'Save Sign Language Settings'}
+            </button>
+            {saved && (
+              <span role="status" className="text-teal-700 text-sm font-semibold flex items-center gap-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Saved
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Page ────────────────────────────────────────── */
 export default function SettingsPage() {
   const { user: authUser } = useAuth();
@@ -216,7 +390,7 @@ export default function SettingsPage() {
 
   const handleLanguageChange = (selectedLang: string) => {
     setLanguage(selectedLang);
-    
+
     const langMap: Record<string, string> = {
       "English (US)": "en",
       "English (UK)": "en",
@@ -226,9 +400,9 @@ export default function SettingsPage() {
       "German": "de",
       "Arabic": "ar",
     };
-    
+
     const targetCode = langMap[selectedLang] || "en";
-    
+
     if (targetCode === "en") {
       document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; domain=" + window.location.hostname + "; path=/;";
@@ -236,7 +410,7 @@ export default function SettingsPage() {
       document.cookie = "googtrans=/en/" + targetCode + "; path=/;";
       document.cookie = "googtrans=/en/" + targetCode + "; domain=" + window.location.hostname + "; path=/;";
     }
-    
+
     window.location.reload();
   };
 
@@ -331,11 +505,10 @@ export default function SettingsPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 aria-current={activeTab === tab.id ? "true" : undefined}
-                className={`flex items-center gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all text-left flex-shrink-0 lg:w-full ${
-                  activeTab === tab.id
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 lg:bg-transparent"
-                }`}
+                className={`flex items-center gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all text-left flex-shrink-0 lg:w-full ${activeTab === tab.id
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 lg:bg-transparent"
+                  }`}
               >
                 <span className="shrink-0">{tab.icon}</span>
                 <span>{tab.label}</span>
@@ -630,7 +803,7 @@ export default function SettingsPage() {
                         <div className="relative flex-1 min-w-0">
                           <Dropdown
                             value="AI Assistant (Female)"
-                            onChange={() => {}}
+                            onChange={() => { }}
                             options={[
                               "AI Assistant (Female)",
                               "AI Assistant (Male)",
@@ -774,6 +947,8 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
+                  {/* ── Sign Language & Gesture Navigation ── */}
+                  <SignLanguageSection />
                 </div>
               </section>
             )}

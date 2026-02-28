@@ -10,7 +10,7 @@ const app = express();
 /* ── Middleware ─────────────────────────────────── */
 app.use(cors({
   origin: [
-    'http://localhost:3000', 
+    'http://localhost:3000',
     'http://localhost:3001',
     process.env.FRONTEND_URL
   ].filter(Boolean),
@@ -25,6 +25,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/courses', require('./routes/courses'));
 app.use('/api/ngo', require('./routes/ngo'));
 app.use('/api/quizzes', require('./routes/quizzes'));
+app.use('/api/signs', require('./routes/signs'));   // Phase 2: sign language vocab
 
 /* ── Health check ───────────────────────────────── */
 app.get('/api/health', (_req, res) => {
