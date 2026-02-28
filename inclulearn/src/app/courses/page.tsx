@@ -195,7 +195,8 @@ export default function CoursesPage() {
 
     const fetchCourses = useCallback(async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/courses', {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const res = await fetch(`${baseUrl}/api/courses`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error();

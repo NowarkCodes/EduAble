@@ -198,7 +198,8 @@ export default function ExploreCoursesPage() {
     const fetchExplore = useCallback(async () => {
         try {
             setError('');
-            const res = await fetch('http://localhost:5000/api/courses/explore', {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const res = await fetch(`${baseUrl}/api/courses/explore`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {

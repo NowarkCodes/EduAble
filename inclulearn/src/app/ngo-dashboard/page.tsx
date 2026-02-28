@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -135,7 +136,8 @@ export default function NgoDashboard() {
       reader.readAsDataURL(audioBlob);
 
       setUploadStatus(`Step 2: Requesting secure Google Cloud upload links for ${videoFile.name}...`);
-      const presignedRes = await fetch('http://localhost:5000/api/ngo/upload-urls', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const presignedRes = await fetch(`${baseUrl}/api/ngo/upload-urls`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,7 +170,8 @@ export default function NgoDashboard() {
   };
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/ngo/stats')
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    fetch(`${baseUrl}/api/ngo/stats`)
       .then(res => res.json())
       .then(data => { if (!data.error) setStats(prev => ({ ...prev, ...data })); })
       .catch(err => console.error('Error fetching dashboard stats:', err));
@@ -177,7 +180,8 @@ export default function NgoDashboard() {
   useEffect(() => {
     if (activeTab === 'video-list' || activeTab === 'course-creation') {
       setIsLoadingVideos(true);
-      fetch('http://localhost:5000/api/ngo/videos')
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      fetch(`${baseUrl}/api/ngo/videos`)
         .then(res => res.json())
         .then(data => {
           if (data.videos) {
@@ -199,7 +203,8 @@ export default function NgoDashboard() {
     setIsCreatingCourse(true);
     setCourseCreationStatus('Creating course...');
     try {
-      const response = await fetch('http://localhost:5000/api/ngo/courses', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${baseUrl}/api/ngo/courses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -6,7 +6,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 
-const BACKEND = 'http://localhost:5000';
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -264,7 +264,8 @@ export default function CourseDetailPage() {
             });
 
             // Persist to backend so it's not hardcoded anymore
-            fetch(`http://localhost:5000/api/courses/lessons/${currentLesson.id}/duration`, {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            fetch(`${baseUrl}/api/courses/lessons/${currentLesson.id}/duration`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
