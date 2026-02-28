@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Logo from '@/components/Logo';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi, OnboardingData } from '@/lib/api';
 import { useAccessibility } from '@/context/AccessibilityContext';
@@ -220,14 +222,10 @@ export default function OnboardingPage() {
 
                 {/* Logo + header */}
                 <div className="text-center mb-6">
-                    <a href="/" className="inline-flex items-center gap-2 text-primary font-extrabold text-lg mb-5">
-                        <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0 transition-transform hover:scale-105">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-                            </svg>
-                        </div>
+                    <Link href="/" className="inline-flex items-center gap-2 text-primary font-extrabold text-lg mb-5">
+                        <Logo className="w-8 h-8 text-primary" />
                         EduAble
-                    </a>
+                    </Link>
                     <h1 className="text-xl sm:text-2xl font-extrabold text-foreground leading-tight transition-colors">
                         Set up your accessibility profile
                     </h1>
