@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { UserIcon, MessageSquare } from 'lucide-react';
+import { UserIcon, MessageSquare, BookOpen } from 'lucide-react';
 import Logo from '@/components/Logo';
 
 /* ── Types ───────────────────────────────────────── */
@@ -82,6 +82,7 @@ const defaultNavItems: NavItemType[] = [
     { label: 'Dashboard', icon: GridIcon, href: '/dashboard' },
     { label: 'My Courses', icon: BookIcon, href: '/courses' },
     { label: 'All Courses', icon: BookIcon, href: '/allcourses' },
+    { label: 'Library', icon: BookOpen, href: '/library' },
     { label: 'Progress', icon: BarIcon, href: '/progress' },
     { label: 'Messages', icon: MessageSquare, href: '/messages' },
     { label: 'Feedback', icon: MessageSquare, href: '/feedback' },

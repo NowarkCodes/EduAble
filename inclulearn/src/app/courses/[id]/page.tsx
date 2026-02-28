@@ -81,9 +81,9 @@ function DownloadIcon() {
     );
 }
 
-function SearchInputIcon() {
+function SearchInputIcon({ className }: { className?: string }) {
     return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
@@ -123,11 +123,23 @@ function Skeleton() {
 
 // ─── Transcript Panel (shared between mobile accordion + desktop sidebar) ─────
 
-function TranscriptPanel({ lesson }: { lesson: Lesson | null }) {
+function TranscriptPanel({ lesson, searchQuery = '' }: { lesson: Lesson | null, searchQuery?: string }) {
+    const renderTranscript = (text: string, query: string) => {
+        if (!query.trim()) return text;
+        const parts = text.split(new RegExp(`(${query})`, 'gi'));
+        return parts.map((part, i) =>
+            part.toLowerCase() === query.toLowerCase() ?
+                <mark key={i} className="bg-yellow-200 text-slate-900 rounded-sm px-0.5">{part}</mark> :
+                part
+        );
+    };
+
     return (
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-sm min-h-0">
             {lesson?.transcript ? (
-                <p className="text-slate-600 leading-relaxed">{lesson.transcript}</p>
+                <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                    {renderTranscript(lesson.transcript, searchQuery)}
+                </p>
             ) : (
                 <div className="flex flex-col items-center justify-center h-full min-h-[120px] text-center text-slate-400 gap-3 py-8">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -163,6 +175,10 @@ export default function CourseDetailPage() {
 
     // Feedback Modal State
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+    // Transcript Search State
+    const [transcriptSearch, setTranscriptSearch] = useState('');
+    const [isTranscriptSearchOpen, setIsTranscriptSearchOpen] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -433,7 +449,17 @@ export default function CourseDetailPage() {
 
                                         {transcriptOpen && (
                                             <div className="mt-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden max-h-72 flex flex-col">
-                                                <TranscriptPanel lesson={currentLesson} />
+                                                <div className="p-3 border-b border-slate-100 bg-slate-50 relative">
+                                                    <SearchInputIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search transcript..."
+                                                        value={transcriptSearch}
+                                                        onChange={e => setTranscriptSearch(e.target.value)}
+                                                        className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <TranscriptPanel lesson={currentLesson} searchQuery={transcriptSearch} />
                                             </div>
                                         )}
                                     </div>
@@ -573,12 +599,31 @@ export default function CourseDetailPage() {
                                                 <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript">
                                                     <DownloadIcon />
                                                 </button>
-                                                <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Search transcript">
+                                                <button
+                                                    onClick={() => setIsTranscriptSearchOpen(prev => !prev)}
+                                                    className={`p-1.5 sm:p-2 transition-colors rounded-lg flex items-center justify-center ${isTranscriptSearchOpen ? 'bg-white text-blue-600 shadow-sm' : 'hover:text-white hover:bg-blue-500'}`}
+                                                    aria-label="Search transcript"
+                                                >
                                                     <SearchInputIcon />
                                                 </button>
                                             </div>
                                         </header>
-                                        <TranscriptPanel lesson={currentLesson} />
+
+                                        {isTranscriptSearchOpen && (
+                                            <div className="p-3 border-b border-slate-100 bg-slate-50 relative shrink-0">
+                                                <SearchInputIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    autoFocus
+                                                    placeholder="Search keywords or phrases..."
+                                                    value={transcriptSearch}
+                                                    onChange={e => setTranscriptSearch(e.target.value)}
+                                                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <TranscriptPanel lesson={currentLesson} searchQuery={transcriptSearch} />
                                     </section>
 
                                     {/* Course Details */}
