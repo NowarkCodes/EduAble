@@ -33,6 +33,8 @@ interface GestureEngineProps {
     onGesture: (id: GestureId) => void;
     /** Minimum ms between two gesture emissions. Default 1500 */
     cooldownMs?: number;
+    /** Callback when the camera stream is acquired */
+    onStreamReady?: (stream: MediaStream) => void;
 }
 
 // ─── Landmark indices (MediaPipe Hands) ───────────────────────────────────────
@@ -119,7 +121,7 @@ function loadScript(src: string): Promise<void> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function GestureEngine({ onGesture, cooldownMs = 1500 }: GestureEngineProps) {
+export default function GestureEngine({ onGesture, cooldownMs = 1500, onStreamReady }: GestureEngineProps) {
     const streamRef = useRef<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const rafRef = useRef<number>(0);
@@ -140,6 +142,12 @@ export default function GestureEngine({ onGesture, cooldownMs = 1500 }: GestureE
 
         async function init() {
             try {
+                // Fix for Next.js Emscripten "Module.arguments has been replaced" error
+                // This happens when FFmpeg and MediaPipe (both Emscripten Wasm) share window.Module
+                if (typeof window !== 'undefined') {
+                    (window as any).Module = undefined;
+                }
+
                 // Load TF.js + MediaPipe Hands from CDN
                 await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js');
                 await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
@@ -209,6 +217,7 @@ export default function GestureEngine({ onGesture, cooldownMs = 1500 }: GestureE
                 if (!mountedRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
 
                 streamRef.current = stream;
+                if (onStreamReady) onStreamReady(stream);
 
                 // Create hidden video element
                 const video = document.createElement('video');
