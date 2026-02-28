@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { AccessibilityProvider } from '@/context/AccessibilityContext';
 import Script from 'next/script';
+import SmoothScrollProvider from '@/components/SmoothScrollProvider';
 
 export const metadata: Metadata = {
   title: 'EduAble — Accessible Education for Every Student',
@@ -29,6 +30,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
+        <SmoothScrollProvider />
         <div id="google_translate_element" style={{ display: 'none' }}></div>
         <AccessibilityProvider>
           <AuthProvider>

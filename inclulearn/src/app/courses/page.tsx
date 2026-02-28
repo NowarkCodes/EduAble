@@ -90,7 +90,7 @@ function InProgressCard({ course }: { course: InProgressCourse }) {
                     <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4">
                         <p className="text-xs font-bold text-blue-600 flex items-center gap-1.5 mb-1">
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M6 1L7.5 4.5L11 5L8.5 7.5L9.2 11L6 9.2L2.8 11L3.5 7.5L1 5L4.5 4.5L6 1Z" /></svg>
-                            AI Summary
+                            Summary
                         </p>
                         <p className="text-xs text-slate-600 leading-relaxed">{course.aiSummary}</p>
                     </div>

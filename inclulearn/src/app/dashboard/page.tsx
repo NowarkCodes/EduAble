@@ -357,22 +357,6 @@ function TopBar() {
                 />
                 <span className="sr-only sm:not-sr-only">Screen Reader Ready</span>
             </div>
-            <button
-                ref={buttonRef}
-                onClick={() => setA11yOn(v => !v)}
-                aria-pressed={a11yOn}
-                aria-controls="main-content"
-                aria-expanded={a11yOn}
-                aria-label={a11yOn ? "Disable accessibility mode" : "Enable accessibility mode"}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors focus:outline-none focus:ring-4 focus:ring-offset-2 ${a11yOn
-                    ? 'bg-blue-600 text-white focus:ring-blue-600'
-                    : 'bg-slate-900 text-white hover:bg-slate-700 focus:ring-slate-900'
-                    }`}
-            >
-                <A11yIcon />
-                <span className="hidden sm:inline">Accessibility</span>
-                <span className="sr-only">{a11yOn ? "on" : "off"}</span>
-            </button>
         </header>
     );
 }

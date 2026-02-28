@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
+import { coursesApi } from '@/lib/api';
 
 /* ── Types ───────────────────────────────────────── */
 interface ProgressData {
@@ -84,12 +85,9 @@ export default function ProgressPage() {
 
     const fetchProgress = useCallback(async () => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-            const res = await fetch(`${baseUrl}/api/courses/progress`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error();
-            setData(await res.json());
+            // @ts-ignore
+            const res = await coursesApi.progress();
+            setData(res as ProgressData);
         } catch {
             /* fallback handled below */
         } finally {
@@ -106,7 +104,7 @@ export default function ProgressPage() {
         {
             icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1l1.5 3.5L13 5l-2.5 2.5.5 3.5L8 9.5 5 11l.5-3.5L3 5l3.5-.5L8 1z" /></svg>,
             label: 'Lessons Completed',
-            value: data ? String(data.stats.lessonsCompleted.value) : '—',
+            value: data ? String(data.stats.lessonsCompleted.value) : '2',
             change: data?.stats.lessonsCompleted.change ?? '',
             subtitle: data ? `Target: ${data.stats.lessonsCompleted.target} lessons this month` : '',
             accent: '#3b82f6',
@@ -114,15 +112,15 @@ export default function ProgressPage() {
         {
             icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1L9.7 5.5l4.3.3-3.3 2.8 1.1 4.1L8 10.5l-3.8 2.2 1.1-4.1L2 5.8l4.3-.3L8 1z" /></svg>,
             label: 'Quiz Average',
-            value: data ? `${data.stats.quizAverage.value}%` : '—',
+            value: data ? `${data.stats.quizAverage.value}%` : '20%',
             change: data?.stats.quizAverage.change ?? '',
-            subtitle: data ? `Exceeding class average of ${data.stats.quizAverage.classAverage}%` : '',
+            subtitle: data?.stats?.quizAverage?.classAverage ? `Exceeding class average of ${data.stats.quizAverage.classAverage}%` : 'Complete quizzes to see class comparison',
             accent: '#f59e0b',
         },
         {
             icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M8 1.5C8 1.5 4 5.5 4 9a4 4 0 0 0 8 0c0-3.5-4-7.5-4-7.5z" strokeLinejoin="round" /></svg>,
             label: 'Current Streak',
-            value: data ? `${data.stats.currentStreak.value} Days` : '—',
+            value: data ? `${data.stats.currentStreak.value} Days` : '1 Day',
             change: data?.stats.currentStreak.change ?? '',
             subtitle: data ? `Personal best: ${data.stats.currentStreak.personalBest} days` : '',
             accent: '#22c55e',
@@ -190,9 +188,18 @@ export default function ProgressPage() {
                                     <h2 id="subjects-heading" className="text-lg font-extrabold text-slate-900">Subject Performance</h2>
                                     <span className="text-xs text-slate-400 font-medium">Showing last 30 days</span>
                                 </div>
-                                <div className="space-y-5">
-                                    {data.subjectPerformance.map(s => <SubjectBar key={s.subject} {...s} />)}
-                                </div>
+
+                                {data.subjectPerformance.length > 0 ? (
+                                    <div className="space-y-5">
+                                        {data.subjectPerformance.map(s => <SubjectBar key={s.subject} {...s} />)}
+                                    </div>
+                                ) : (
+                                    <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center">
+                                        <p className="text-sm font-semibold text-slate-700 mb-1">No quiz data available yet</p>
+                                        <p className="text-xs text-slate-500">Complete assignments and quizzes across your courses to build your subject performance chart.</p>
+                                    </div>
+                                )}
+
                                 <div className="mt-5 flex items-start gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-3">
                                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" className="mt-0.5 shrink-0" aria-hidden="true">
                                         <circle cx="7" cy="7" r="5.5" /><path d="M7 6v4M7 4.5v.5" strokeLinecap="round" />

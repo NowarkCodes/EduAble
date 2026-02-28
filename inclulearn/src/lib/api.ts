@@ -79,6 +79,16 @@ export const feedbackApi = {
   list: () => request<unknown[]>('/api/feedback'),
 };
 
+/* ── Payment & Transcript Requests ────────────────── */
+export const paymentApi = {
+  createOrder: () => request<{ success: boolean; order: { id: string; amount: number; currency: string } }>('/api/payment/create-order', { method: 'POST' }),
+  verifyPayment: (payload: Record<string, unknown>) => request<{ success: boolean }>('/api/payment/verify-payment', { method: 'POST', body: payload }),
+};
+
+export const transcriptRequestApi = {
+  list: () => request<{ success: boolean; requests: any[] }>('/api/transcript-requests'),
+};
+
 /* ── Types ────────────────────────────────────────── */
 export type AuthUser = {
   id: string;

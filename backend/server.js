@@ -28,6 +28,8 @@ app.use('/api/quizzes', require('./routes/quizzes'));
 app.use('/api/signs', require('./routes/signs'));   // Phase 2: sign language vocab
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/feedback', require('./routes/feedback'));
+app.use('/api/payment', require('./routes/payment'));
+app.use('/api/transcript-requests', require('./routes/transcriptRequests'));
 
 /* ── Health check ───────────────────────────────── */
 app.get('/api/health', (_req, res) => {

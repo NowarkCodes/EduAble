@@ -40,7 +40,7 @@ export default function Testimonials() {
                 </header>
 
                 <ul className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 list-none" role="list" aria-label="Student testimonials">
-                    {testimonials.map((t) => (
+                    {testimonials.map((t, i) => (
                         <li key={t.name}>
                             <article aria-label={`Testimonial from ${t.name}`}>
                                 <Card className={`h-full border-t-4 ${t.accentColor} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-card border-border`}>

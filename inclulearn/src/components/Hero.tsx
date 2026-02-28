@@ -19,7 +19,7 @@ export default function Hero() {
             <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center pb-16 lg:pb-24">
 
                 {/* ---- Left: Text Content ---- */}
-                <div className="animate-fade-in-up text-center lg:text-left">
+                <div className="text-center lg:text-left">
 
                     <h1
                         id="hero-heading"
@@ -81,7 +81,7 @@ export default function Hero() {
                 </div>
 
                 {/* ---- Right: Stats Card ---- */}
-                <div className="relative animate-fade-in-up [animation-delay:200ms] hidden sm:block">
+                <div className="relative hidden sm:block">
                     {/* Floating badge — top */}
                     <div
                         aria-hidden="true"

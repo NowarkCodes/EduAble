@@ -1,9 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import Image from 'next/image';
+import Link from 'next/link';
+
+interface Course {
+    id: string;
+    title: string;
+    progress?: number;
+    lastAccessed?: string;
+    completedDate?: string;
+}
 
 function MailIcon() {
     return (
@@ -120,14 +130,43 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 }
 
 export default function ProfilePage() {
-    const { user } = useAuth();
-    const [screenReader, setScreenReader] = useState(false);
-    const [highContrast, setHighContrast] = useState(true);
-    const [dyslexiaFont, setDyslexiaFont] = useState(false);
+    const { user, token } = useAuth();
+    const {
+        screenReader, setScreenReader,
+        highContrast, setHighContrast,
+        dyslexiaFont, setDyslexiaFont
+    } = useAccessibility();
 
-    const initials = (user?.name ?? 'Alex Johnson').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-    const displayName = user?.name ?? 'Alex Johnson';
-    const email = user?.email ?? 'alex.johnson@example.com';
+    const [inProgress, setInProgress] = useState<Course[]>([]);
+    const [completed, setCompleted] = useState<Course[]>([]);
+    const [loadingCourses, setLoadingCourses] = useState(true);
+
+    const fetchCourses = useCallback(async () => {
+        if (!token) return;
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const res = await fetch(`${baseUrl}/api/courses`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const json = await res.json();
+                setInProgress(json.inProgress ?? []);
+                setCompleted(json.completed ?? []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch courses:', err);
+        } finally {
+            setLoadingCourses(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        fetchCourses();
+    }, [fetchCourses]);
+
+    const initials = (user?.name ?? '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
+    const displayName = user?.name ?? 'Guest User';
+    const email = user?.email ?? 'No email associated';
 
     return (
         <DashboardLayout userInitials={initials} userName={displayName} userTier="Standard Account">
@@ -230,59 +269,75 @@ export default function ProfilePage() {
                             <TrendingUpIcon />
                             Learning Progress
                         </h2>
-                        <a href="/allcourses" className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">View All Courses</a>
+                        <Link href="/courses" className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">View All My Courses</Link>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* In Progress Card */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group">
-                            <div className="bg-blue-100/50 p-6 pb-5">
-                                <span className="inline-block bg-blue-600 text-white text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md mb-3">In Progress</span>
-                                <h3 className="text-xl font-extrabold text-slate-800">AI Ethics & Bias Mitigation</h3>
-                            </div>
-                            <div className="p-6 flex-1 flex flex-col">
-                                <div className="flex justify-between items-end mb-2">
-                                    <span className="text-sm font-medium text-slate-600">Course Completion</span>
-                                    <span className="text-lg font-black text-blue-600 leading-none">75%</span>
-                                </div>
-                                <div className="h-2 bg-slate-100 rounded-full mb-6 overflow-hidden">
-                                    <div className="h-full bg-blue-600 rounded-full" style={{ width: '75%' }} />
-                                </div>
-                                <div className="flex justify-between items-center mt-auto">
-                                    <span className="text-sm text-slate-400">Last accessed: 2 days ago</span>
-                                    <a href="#" className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:text-blue-800 transition-colors">
-                                        Continue <ArrowRightIcon />
-                                    </a>
-                                </div>
-                            </div>
+                    {loadingCourses ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-slate-100 animate-pulse rounded-2xl h-48 border border-slate-200" />
+                            <div className="bg-slate-100 animate-pulse rounded-2xl h-48 border border-slate-200" />
                         </div>
+                    ) : inProgress.length === 0 && completed.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500 shadow-sm">
+                            <p>You haven't started any courses yet.</p>
+                            <Link href="/allcourses" className="text-blue-600 font-bold hover:underline mt-2 inline-block">Explore Courses</Link>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* In Progress Cards */}
+                            {inProgress.slice(0, 2).map(course => (
+                                <div key={`in-prog-${course.id}`} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group">
+                                    <div className="bg-blue-100/50 p-6 pb-5">
+                                        <span className="inline-block bg-blue-600 text-white text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md mb-3">In Progress</span>
+                                        <h3 className="text-xl font-extrabold text-slate-800">{course.title}</h3>
+                                    </div>
+                                    <div className="p-6 flex-1 flex flex-col">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="text-sm font-medium text-slate-600">Course Completion</span>
+                                            <span className="text-lg font-black text-blue-600 leading-none">{course.progress}%</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full mb-6 overflow-hidden">
+                                            <div className="h-full bg-blue-600 rounded-full" style={{ width: `${course.progress}%` }} />
+                                        </div>
+                                        <div className="flex justify-between items-center mt-auto">
+                                            <span className="text-sm text-slate-400 truncate pr-2">Last accessed: {course.lastAccessed}</span>
+                                            <Link href={`/courses/${course.id}`} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:text-blue-800 transition-colors shrink-0">
+                                                Continue <ArrowRightIcon />
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
 
-                        {/* Completed Card */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
-                            <div className="bg-emerald-100/50 p-6 pb-5">
-                                <div className="absolute top-5 right-5">
-                                    <CheckCircleIcon />
+                            {/* Completed Cards */}
+                            {completed.slice(0, Math.max(0, 2 - inProgress.slice(0, 2).length)).map(course => (
+                                <div key={`comp-${course.id}`} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
+                                    <div className="bg-emerald-100/50 p-6 pb-5">
+                                        <div className="absolute top-5 right-5">
+                                            <CheckCircleIcon />
+                                        </div>
+                                        <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md mb-3">Completed</span>
+                                        <h3 className="text-xl font-extrabold text-emerald-900">{course.title}</h3>
+                                    </div>
+                                    <div className="p-6 flex-1 flex flex-col">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="text-sm font-medium text-slate-600">Course Completion</span>
+                                            <span className="text-lg font-black text-emerald-600 leading-none">100%</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full mb-6 overflow-hidden">
+                                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: '100%' }} />
+                                        </div>
+                                        <div className="flex justify-between items-center mt-auto">
+                                            <span className="text-sm text-slate-400 truncate pr-2">Completed on: {new Date(course.completedDate || '').toLocaleDateString()}</span>
+                                            <Link href={`/courses/${course.id}`} className="text-sm font-bold text-slate-700 flex items-center gap-1.5 hover:text-slate-900 transition-colors shrink-0">
+                                                Review
+                                            </Link>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-md mb-3">Completed</span>
-                                <h3 className="text-xl font-extrabold text-emerald-900">Inclusive Design Systems</h3>
-                            </div>
-                            <div className="p-6 flex-1 flex flex-col">
-                                <div className="flex justify-between items-end mb-2">
-                                    <span className="text-sm font-medium text-slate-600">Course Completion</span>
-                                    <span className="text-lg font-black text-emerald-600 leading-none">100%</span>
-                                </div>
-                                <div className="h-2 bg-slate-100 rounded-full mb-6 overflow-hidden">
-                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '100%' }} />
-                                </div>
-                                <div className="flex justify-between items-center mt-auto">
-                                    <span className="text-sm text-slate-400">Completed on: Oct 12, 2023</span>
-                                    <a href="#" className="text-sm font-bold text-slate-700 flex items-center gap-1.5 hover:text-slate-900 transition-colors">
-                                        <DownloadIcon /> Certificate
-                                    </a>
-                                </div>
-                            </div>
+                            ))}
                         </div>
-                    </div>
+                    )}
                 </div>
 
             </div>
