@@ -8,6 +8,7 @@ const {
   enrollCourse,
   completeLesson,
   updateLessonDuration,
+  transcribeLesson,
 } = require('../controllers/coursesController');
 const Course = require('../models/Course'); // Added for the explore route
 
@@ -66,5 +67,6 @@ router.get('/:id', accessibilityMiddleware, getCourse);
 router.post('/:id/enroll', enrollCourse);
 router.post('/:courseId/lessons/:lessonId/complete', completeLesson);
 router.patch('/lessons/:id/duration', updateLessonDuration);
+router.post('/lessons/:lessonId/transcribe', transcribeLesson);
 
 module.exports = router;

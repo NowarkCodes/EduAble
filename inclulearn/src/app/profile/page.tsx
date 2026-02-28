@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
-import Image from 'next/image';
 import Link from 'next/link';
+
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 interface Course {
     id: string;
@@ -129,6 +130,166 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
     );
 }
 
+/* ── Edit Profile Modal ─────────────────────────────────── */
+function EditProfileModal({ open, onClose, currentName, currentBio, currentPhone, token, onSaved }: {
+    open: boolean;
+    onClose: () => void;
+    currentName: string;
+    currentBio: string;
+    currentPhone: string;
+    token: string | null;
+    onSaved: (data: { name: string; bio: string; phone: string }) => void;
+}) {
+    const [name, setName] = useState(currentName);
+    const [bio, setBio] = useState(currentBio);
+    const [phone, setPhone] = useState(currentPhone);
+    const [showPw, setShowPw] = useState(false);
+    const [currentPw, setCurrentPw] = useState('');
+    const [newPw, setNewPw] = useState('');
+    const [confirmPw, setConfirmPw] = useState('');
+    const [showCurrent, setShowCurrent] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
+
+    // Sync fields when modal re-opens
+    useEffect(() => {
+        if (open) { setName(currentName); setBio(currentBio); setPhone(currentPhone); setError(''); setSuccess(false); setShowPw(false); setCurrentPw(''); setNewPw(''); setConfirmPw(''); }
+    }, [open, currentName, currentBio, currentPhone]);
+
+    // Close on Escape
+    useEffect(() => {
+        if (!open) return;
+        const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', fn);
+        return () => window.removeEventListener('keydown', fn);
+    }, [open, onClose]);
+
+    if (!open) return null;
+
+    async function handleSave(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        if (!name.trim()) { setError('Name is required.'); return; }
+        if (showPw) {
+            if (!currentPw) { setError('Enter your current password.'); return; }
+            if (newPw.length < 8) { setError('New password must be at least 8 characters.'); return; }
+            if (newPw !== confirmPw) { setError('New passwords do not match.'); return; }
+        }
+        setSaving(true);
+        try {
+            const body: Record<string, string> = { name, bio, phone };
+            if (showPw && currentPw && newPw) { body.currentPassword = currentPw; body.newPassword = newPw; }
+            const res = await fetch(`${BACKEND}/api/profile/me`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Save failed');
+            setSuccess(true);
+            onSaved({ name: data.user.name, bio: data.bio, phone: data.phone });
+            setTimeout(onClose, 1000);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Something went wrong.');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Edit profile">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+
+            {/* Panel */}
+            <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+                    <h2 className="text-lg font-black text-slate-900">Edit Profile</h2>
+                    <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSave} className="p-6 space-y-5">
+                    {/* Name */}
+                    <div>
+                        <label htmlFor="ep-name" className="block text-sm font-bold text-slate-700 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+                        <input id="ep-name" type="text" value={name} onChange={e => setName(e.target.value)} maxLength={100}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                            placeholder="Your full name"
+                        />
+                    </div>
+
+                    {/* Bio */}
+                    <div>
+                        <label htmlFor="ep-bio" className="block text-sm font-bold text-slate-700 mb-1.5">Bio <span className="text-slate-400 font-normal">(optional)</span></label>
+                        <textarea id="ep-bio" value={bio} onChange={e => setBio(e.target.value)} maxLength={300} rows={3}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none"
+                            placeholder="Tell us a bit about yourself…"
+                        />
+                        <p className="text-xs text-slate-400 mt-1 text-right">{bio.length}/300</p>
+                    </div>
+
+                    {/* Phone */}
+                    <div>
+                        <label htmlFor="ep-phone" className="block text-sm font-bold text-slate-700 mb-1.5">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
+                        <input id="ep-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                            placeholder="+91 98765 43210"
+                        />
+                    </div>
+
+                    {/* Change Password toggle */}
+                    <div className="pt-2 border-t border-slate-100">
+                        <button type="button" onClick={() => setShowPw(v => !v)}
+                            className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors focus:outline-none"
+                        >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                            {showPw ? 'Cancel password change' : 'Change Password'}
+                        </button>
+                        {showPw && (
+                            <div className="mt-4 space-y-3">
+                                {[{ id: 'ep-cur-pw', label: 'Current Password', val: currentPw, set: setCurrentPw, show: showCurrent, toggle: setShowCurrent }, { id: 'ep-new-pw', label: 'New Password (min 8 chars)', val: newPw, set: setNewPw, show: showNew, toggle: setShowNew }, { id: 'ep-conf-pw', label: 'Confirm New Password', val: confirmPw, set: setConfirmPw, show: showNew, toggle: setShowNew }].map(({ id, label, val, set, show, toggle }) => (
+                                    <div key={id}>
+                                        <label htmlFor={id} className="block text-xs font-bold text-slate-600 mb-1">{label}</label>
+                                        <div className="relative">
+                                            <input id={id} type={show ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)}
+                                                className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            />
+                                            <button type="button" onClick={() => toggle(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">{show ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></> : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>}</svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Error / Success */}
+                    {error && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">{error}</p>}
+                    {success && <p role="status" className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>Profile updated!</p>}
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-2">
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={saving} aria-busy={saving}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {saving ? <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />Saving…</> : 'Save Changes'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export default function ProfilePage() {
     const { user, token } = useAuth();
     const {
@@ -140,12 +301,42 @@ export default function ProfilePage() {
     const [inProgress, setInProgress] = useState<Course[]>([]);
     const [completed, setCompleted] = useState<Course[]>([]);
     const [loadingCourses, setLoadingCourses] = useState(true);
+    const [editOpen, setEditOpen] = useState(false);
+
+    // Editable profile data
+    const [profileData, setProfileData] = useState({ name: '', bio: '', phone: '' });
+
+    // Fetch extra profile fields (bio, phone) on mount
+    useEffect(() => {
+        if (!token || !user) return;
+        fetch(`${BACKEND}/api/profile/${user.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data?.profile) {
+                    setProfileData({
+                        name: user.name || '',
+                        bio: data.profile.bio || '',
+                        phone: data.profile.contactNumber || '',
+                    });
+                } else {
+                    setProfileData({ name: user.name || '', bio: '', phone: '' });
+                }
+            })
+            .catch(() => setProfileData({ name: user.name || '', bio: '', phone: '' }));
+    }, [token, user]);
+
+    // Keep name in sync when user loads
+    useEffect(() => {
+        if (user?.name) setProfileData(p => ({ ...p, name: user.name }));
+    }, [user?.name]);
+
 
     const fetchCourses = useCallback(async () => {
         if (!token) return;
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-            const res = await fetch(`${baseUrl}/api/courses`, {
+            const res = await fetch(`${BACKEND}/api/courses`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {
@@ -160,44 +351,57 @@ export default function ProfilePage() {
         }
     }, [token]);
 
-    useEffect(() => {
-        fetchCourses();
-    }, [fetchCourses]);
+    useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
-    const initials = (user?.name ?? '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
-    const displayName = user?.name ?? 'Guest User';
+    const displayName = profileData.name || user?.name || 'Guest User';
     const email = user?.email ?? 'No email associated';
+    const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
+
 
     return (
         <DashboardLayout userInitials={initials} userName={displayName} userTier="Standard Account">
+            {/* Edit Profile Modal */}
+            <EditProfileModal
+                open={editOpen}
+                onClose={() => setEditOpen(false)}
+                currentName={profileData.name || displayName}
+                currentBio={profileData.bio}
+                currentPhone={profileData.phone}
+                token={token}
+                onSaved={(data) => setProfileData(data)}
+            />
+
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
 
                 {/* Profile Header */}
                 <div className="bg-white rounded-2xl p-6 md:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 border border-slate-200 shadow-sm text-center sm:text-left">
-                    <div className="w-24 h-24 rounded-full bg-blue-100 overflow-hidden flex-shrink-0 border-4 border-white shadow-sm flex items-center justify-center relative">
-                        {/* Placeholder avatar */}
-                        <svg viewBox="0 0 80 80" className="w-full h-full text-blue-300">
-                            <circle cx="40" cy="40" r="40" fill="currentColor" opacity="0.4" />
-                            <circle cx="40" cy="30" r="14" fill="currentColor" />
-                            <ellipse cx="40" cy="68" rx="24" ry="18" fill="currentColor" />
-                        </svg>
+                    {/* Avatar — initials circle */}
+                    <div className="w-24 h-24 rounded-full bg-blue-600 flex-shrink-0 border-4 border-white shadow-md flex items-center justify-center">
+                        <span className="text-white text-3xl font-black select-none">{initials}</span>
                     </div>
 
                     <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-slate-900 mb-2">{displayName}</h1>
-                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-6 text-sm text-slate-500 font-medium mb-1">
+                        <h1 className="text-3xl font-bold text-slate-900 mb-1">{displayName}</h1>
+                        {profileData.bio && (
+                            <p className="text-sm text-slate-600 mb-2 max-w-md">{profileData.bio}</p>
+                        )}
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-6 text-sm text-slate-500 font-medium">
                             <div className="flex items-center gap-2">
-                                <MailIcon />
-                                <span>{email}</span>
+                                <MailIcon /><span>{email}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <GlobeIcon />
-                                <span>English (US)</span>
-                            </div>
+                            {profileData.phone && (
+                                <div className="flex items-center gap-2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+                                    <span>{profileData.phone}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-colors focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 w-full sm:w-auto mt-4 sm:mt-0 justify-center">
+                    <button
+                        onClick={() => setEditOpen(true)}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-colors focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 w-full sm:w-auto mt-4 sm:mt-0 justify-center"
+                    >
                         <EditIcon />
                         Edit Profile
                     </button>

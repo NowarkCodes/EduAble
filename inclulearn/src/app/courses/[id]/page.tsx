@@ -202,6 +202,9 @@ export default function CourseDetailPage() {
     const [transcriptSearch, setTranscriptSearch] = useState('');
     const [isTranscriptSearchOpen, setIsTranscriptSearchOpen] = useState(false);
 
+    // Deepgram Transcription State
+    const [isTranscribing, setIsTranscribing] = useState(false);
+
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // ── Accessibility / Gesture / Sign Language state ─────────────────────────
@@ -401,6 +404,28 @@ export default function CourseDetailPage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // ── Deepgram: Generate transcript for the current lesson ────────────────
+    const handleGenerateTranscript = useCallback(async () => {
+        if (!currentLesson || !token || isTranscribing) return;
+        setIsTranscribing(true);
+        try {
+            const res = await fetch(`${BACKEND}/api/courses/lessons/${currentLesson.id}/transcribe`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Transcription failed');
+            // Update local lessons state so TranscriptPanel re-renders without a page reload
+            setLessons(prev => prev.map(l =>
+                l.id === currentLesson.id ? { ...l, transcript: data.transcript } : l
+            ));
+        } catch (err) {
+            console.error('[Deepgram] Transcription error:', err);
+        } finally {
+            setIsTranscribing(false);
+        }
+    }, [currentLesson, token, isTranscribing]);
+
     // ── Gesture handler — wired to existing controls ────────────────────────
     const handleGesture = useCallback((id: GestureId) => {
         setActiveGesture(id);
@@ -589,6 +614,28 @@ export default function CourseDetailPage() {
                                                         className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     />
                                                 </div>
+                                                {/* Mobile Generate Transcript button */}
+                                                {currentLesson?.videoUrl && (
+                                                    <div className="px-4 pt-3 pb-1 flex justify-end border-b border-slate-100">
+                                                        <button
+                                                            onClick={handleGenerateTranscript}
+                                                            disabled={isTranscribing || !currentLesson?.videoUrl}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            aria-label="Generate transcript using Deepgram AI"
+                                                        >
+                                                            {isTranscribing ? (
+                                                                <>
+                                                                    <span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                                                                    Transcribing…
+                                                                </>
+                                                            ) : currentLesson?.transcript ? (
+                                                                '↺ Regenerate'
+                                                            ) : (
+                                                                '✨ Generate'
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )}
                                                 <TranscriptPanel lesson={currentLesson} searchQuery={transcriptSearch} />
                                             </div>
                                         )}
@@ -726,6 +773,27 @@ export default function CourseDetailPage() {
                                                 </div>
                                             </div>
                                             <div className="flex gap-1 sm:gap-1.5 text-blue-200">
+                                                {/* Generate / Regenerate Transcript button */}
+                                                {currentLesson?.videoUrl && (
+                                                    <button
+                                                        onClick={handleGenerateTranscript}
+                                                        disabled={isTranscribing}
+                                                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-blue-500 hover:bg-blue-400 text-white disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
+                                                        aria-label={isTranscribing ? 'Transcribing audio with Deepgram…' : 'Generate AI transcript'}
+                                                        title={currentLesson?.transcript ? 'Regenerate transcript' : 'Generate transcript with Deepgram AI'}
+                                                    >
+                                                        {isTranscribing ? (
+                                                            <>
+                                                                <span className="w-2.5 h-2.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                                                                <span>Transcribing…</span>
+                                                            </>
+                                                        ) : currentLesson?.transcript ? (
+                                                            <span>↺ Regenerate</span>
+                                                        ) : (
+                                                            <span>✨ Generate</span>
+                                                        )}
+                                                    </button>
+                                                )}
                                                 <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript">
                                                     <DownloadIcon />
                                                 </button>

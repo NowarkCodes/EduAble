@@ -13,6 +13,12 @@ const AccessibilityProfileSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [300, 'Bio must be 300 characters or less'],
+      default: '',
+    },
     age: {
       type: Number,
       min: 0,

@@ -79,6 +79,11 @@ export function AccessibilityProvider({ children }: { children: ReactNode }) {
             // eslint-disable-next-line
             setBlinkitThemeState(storedTheme);
         }
+        // Restore dyslexia font preference
+        const storedDyslexia = localStorage.getItem('EduAble_dyslexiaFont');
+        if (storedDyslexia === 'true') {
+            setDyslexiaFont(true);
+        }
     }, []);
 
     const setBlinkitTheme = (theme: string) => {
@@ -126,6 +131,9 @@ export function AccessibilityProvider({ children }: { children: ReactNode }) {
         setCaptionBgOpacity('100%');
         setCaptionFontFamily('Sans Serif');
         setBlinkitTheme('');
+
+        // Clear persisted dyslexia font preference
+        localStorage.removeItem('EduAble_dyslexiaFont');
     }
 
     // Effect to apply dynamic styles to the <body> tag when these values change
@@ -149,11 +157,14 @@ export function AccessibilityProvider({ children }: { children: ReactNode }) {
             root.classList.remove('reduce-motion');
         }
 
-        // Dyslexia Font
+        // Dyslexia Font — toggle a CSS class on <html> so it works with the @font-face declaration
+        // and beats Tailwind/Next.js font class overrides. Also persist to localStorage.
         if (dyslexiaFont) {
-            document.body.style.fontFamily = "'OpenDyslexic', sans-serif";
+            document.documentElement.classList.add('dyslexia-font');
+            localStorage.setItem('EduAble_dyslexiaFont', 'true');
         } else {
-            document.body.style.fontFamily = ''; // Revert to default
+            document.documentElement.classList.remove('dyslexia-font');
+            localStorage.removeItem('EduAble_dyslexiaFont');
         }
 
         // Apply Blinkit Theme Classes

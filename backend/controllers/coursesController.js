@@ -5,6 +5,8 @@ const LessonProgress = require('../models/LessonProgress');
 const QuizAttempt = require('../models/QuizAttempt');
 const asyncHandler = require('../utils/asyncHandler');
 const { calculateStreak } = require('../utils/streakCalculator');
+const { transcribeUrl } = require('../services/deepgramService');
+const { Storage } = require('@google-cloud/storage');
 
 /* ── GET /api/courses ───────────────────────────────────────────── */
 exports.listCourses = asyncHandler(async (req, res) => {
@@ -87,6 +89,9 @@ exports.getCourse = asyncHandler(async (req, res) => {
             videoUrl: lesson.videoUrl,
             notesMarkdown: lesson.notesMarkdown,
             completed: completedLessonIds.has(lesson._id.toString()),
+            // Always include transcript so TranscriptPanel and the Generate button work for all users
+            transcript: lesson.transcript || '',
+            signLanguageVttUrl: lesson.signLanguageVttUrl || '',
         };
 
         if (!a11y) return base;
@@ -365,4 +370,75 @@ exports.updateLessonDuration = asyncHandler(async (req, res) => {
     }
 
     res.json({ message: 'Lesson duration updated.', duration: lesson.duration });
+});
+
+/* ── POST /api/courses/lessons/:lessonId/transcribe ─────────────── */
+exports.transcribeLesson = asyncHandler(async (req, res) => {
+    const { lessonId } = req.params;
+
+    // 1. Find the lesson
+    const lesson = await Lesson.findById(lessonId);
+    if (!lesson) {
+        return res.status(404).json({ error: 'Lesson not found.' });
+    }
+
+    // 2. Ensure this user is enrolled in the course (security check)
+    const enrollment = await Enrollment.findOne({
+        userId: req.user._id,
+        courseId: lesson.courseId,
+    });
+    if (!enrollment) {
+        return res.status(403).json({ error: 'You are not enrolled in this course.' });
+    }
+
+    // 3. Return cached transcript if it already exists (avoid re-billing Deepgram)
+    if (lesson.transcript && lesson.transcript.trim().length > 10) {
+        return res.json({
+            transcript: lesson.transcript,
+            cached: true,
+        });
+    }
+
+    // 4. Ensure there is a video to transcribe
+    if (!lesson.videoUrl) {
+        return res.status(400).json({ error: 'This lesson has no video to transcribe.' });
+    }
+
+    // 5. Obtain a signed GCS URL for the video so Deepgram can access it
+    let transcribeTarget = lesson.videoUrl;
+    try {
+        const parsed = new URL(lesson.videoUrl);
+        // Only sign if it's a raw GCS URL (not already signed)
+        if (!parsed.searchParams.has('X-Goog-Signature')) {
+            const storage = new Storage({
+                projectId: process.env.GCS_PROJECT_ID,
+                credentials: {
+                    client_email: process.env.GCS_CLIENT_EMAIL,
+                    private_key: (process.env.GCS_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+                },
+            });
+            const pathParts = parsed.pathname.split('/').slice(2);
+            const objectPath = decodeURIComponent(pathParts.join('/'));
+            const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+            const file = bucket.file(objectPath);
+            const [signedUrl] = await file.getSignedUrl({
+                version: 'v4',
+                action: 'read',
+                expires: Date.now() + 30 * 60 * 1000, // 30 minutes for Deepgram to fetch
+            });
+            transcribeTarget = signedUrl;
+        }
+    } catch (e) {
+        // If URL parsing fails, pass the raw URL to Deepgram as-is
+        console.warn('[transcribeLesson] Could not sign GCS URL, using raw URL:', e.message);
+    }
+
+    // 6. Call Deepgram
+    const transcript = await transcribeUrl(transcribeTarget);
+
+    // 7. Persist to MongoDB
+    lesson.transcript = transcript;
+    await lesson.save();
+
+    res.json({ transcript, cached: false });
 });

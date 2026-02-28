@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { UserIcon, MessageSquare, BookOpen } from 'lucide-react';
 import Logo from '@/components/Logo';
 
@@ -90,45 +91,76 @@ const defaultNavItems: NavItemType[] = [
     { label: 'Profile', icon: UserIcon, href: '/profile' },
 ];
 
-/* ── Sidebar ─────────────────────────────────────── */
-function Sidebar({ userInitials, userName, userTier, items, onLogout }: { userInitials: string; userName: string; userTier: string; items: NavItemType[]; onLogout: () => void }) {
+/* ── Sidebar ───────────────────────────────────── */
+function Sidebar({ userInitials, userName, userTier, items, onLogout, collapsed, searchRef }: {
+    userInitials: string; userName: string; userTier: string;
+    items: NavItemType[]; onLogout: () => void;
+    collapsed: boolean;
+    searchRef: React.RefObject<HTMLInputElement | null>;
+}) {
     const pathname = usePathname();
+    const router = useRouter();
+    const [searchVal, setSearchVal] = useState('');
+
+    function handleSearch(e: React.FormEvent) {
+        e.preventDefault();
+        if (searchVal.trim()) {
+            router.push(`/allcourses?q=${encodeURIComponent(searchVal.trim())}`);
+            setSearchVal('');
+        }
+    }
 
     return (
-        <aside className="hidden md:flex flex-col w-52 min-h-screen bg-white mobile-drawer-bg border-r border-slate-200 py-6 px-3 fixed left-0 top-0 z-40">
+        <aside
+            id="main-sidebar"
+            className={`hidden md:flex flex-col min-h-screen bg-white mobile-drawer-bg border-r border-slate-200 py-6 px-3 fixed left-0 top-0 z-40 transition-all duration-300 ${collapsed ? 'w-16' : 'w-52'
+                }`}
+        >
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 px-3 mb-8 text-slate-900 font-extrabold text-lg tracking-tight">
-                <Logo className="w-8 h-8 text-blue-600" />
-                EduAble
+            <Link href="/" className="flex items-center gap-2 px-3 mb-6 text-slate-900 font-extrabold text-lg tracking-tight overflow-hidden">
+                <Logo className="w-8 h-8 text-blue-600 shrink-0" />
+                {!collapsed && <span className="truncate">EduAble</span>}
             </Link>
+
+            {/* Global Search — Alt+S */}
+            {!collapsed && (
+                <form onSubmit={handleSearch} className="mb-4 px-1">
+                    <div className="relative">
+                        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <circle cx="6.5" cy="6.5" r="4.5" /><path d="M10.5 10.5l3.5 3.5" strokeLinecap="round" />
+                        </svg>
+                        <input
+                            ref={searchRef}
+                            type="search"
+                            value={searchVal}
+                            onChange={e => setSearchVal(e.target.value)}
+                            placeholder="Search courses… (Alt+S)"
+                            aria-label="Global search"
+                            className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+                        />
+                    </div>
+                </form>
+            )}
 
             {/* Nav */}
             <nav aria-label="Main navigation" className="flex flex-col gap-1 flex-1">
                 {items.map(({ label, icon: Icon, href, onClick, isActive }) => {
-                    // Use active prop if provided (for SPA tabs), otherwise fallback to pathname matching
                     const active = isActive !== undefined ? isActive : ((pathname === href) || (pathname.startsWith(href + '/') && href !== '/'));
-
-                    const commonClasses = `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors w-full text-left
-                                ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`;
+                    const commonClasses = `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors w-full text-left ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`;
 
                     if (onClick) {
                         return (
-                            <button key={label} onClick={onClick} className={commonClasses} aria-current={active ? 'page' : undefined}>
-                                <Icon size={16} />
-                                {label}
+                            <button key={label} onClick={onClick} className={commonClasses} aria-current={active ? 'page' : undefined} title={collapsed ? label : undefined}>
+                                <Icon size={16} className="shrink-0" />
+                                {!collapsed && label}
                             </button>
                         );
                     }
-
                     return (
-                        <Link
-                            key={label}
-                            href={href}
-                            aria-current={active ? 'page' : undefined}
-                            className={commonClasses}
-                        >
-                            <Icon size={16} />
-                            {label}
+                        <Link key={label} href={href} aria-current={active ? 'page' : undefined} className={commonClasses} title={collapsed ? label : undefined}>
+                            <Icon size={16} className="shrink-0" />
+                            {!collapsed && label}
                         </Link>
                     );
                 })}
@@ -136,21 +168,24 @@ function Sidebar({ userInitials, userName, userTier, items, onLogout }: { userIn
 
             {/* User + Logout */}
             <div className="pt-4 border-t border-slate-200 mt-4 space-y-3">
-                <div className="flex items-center gap-3 px-2">
-                    <div className="w-9 h-9 rounded-full bg-blue-600 shrink-0 flex items-center justify-center text-white font-bold text-xs">
-                        {userInitials}
+                {!collapsed && (
+                    <div className="flex items-center gap-3 px-2">
+                        <div className="w-9 h-9 rounded-full bg-blue-600 shrink-0 flex items-center justify-center text-white font-bold text-xs">
+                            {userInitials}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{userName}</p>
+                            <p className="text-xs text-slate-500 truncate">{userTier}</p>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{userName}</p>
-                        <p className="text-xs text-slate-500 truncate">{userTier}</p>
-                    </div>
-                </div>
+                )}
                 <button
                     onClick={onLogout}
                     className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-sm font-semibold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    title={collapsed ? 'Sign Out' : undefined}
                 >
                     <LogoutIcon />
-                    Sign Out
+                    {!collapsed && 'Sign Out'}
                 </button>
             </div>
         </aside>
@@ -278,12 +313,18 @@ export default function DashboardLayout({
     navItems = defaultNavItems
 }: DashboardLayoutProps) {
     const { user, loading, logout } = useAuth();
+    const { highContrast, setHighContrast } = useAccessibility();
     const router = useRouter();
     const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [readingAloud, setReadingAloud] = useState(false);
+    const [shortcutToast, setShortcutToast] = useState<string | null>(null);
+    const searchRef = useRef<HTMLInputElement | null>(null);
+    const mainRef = useRef<HTMLElement | null>(null);
+    const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
     // ── Session Protection ───────────────────────────
-    // If loading is finished and no user exists, kick them to login
     useEffect(() => {
         if (!loading && !user) {
             const isNgoPath = pathname.startsWith('/ngo-dashboard') || pathname === '/ngo';
@@ -291,7 +332,91 @@ export default function DashboardLayout({
         }
     }, [user, loading, router, pathname]);
 
+    // ── Show shortcut toast briefly ──────────────────
+    const showToast = useCallback((msg: string) => {
+        setShortcutToast(msg);
+        setTimeout(() => setShortcutToast(null), 2000);
+    }, []);
+
+    // ── Global keyboard shortcuts ────────────────────
+    useEffect(() => {
+        function handleKey(e: KeyboardEvent) {
+            // Skip if user is typing in an input / textarea
+            const tag = (e.target as HTMLElement)?.tagName;
+            const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+            if (!e.altKey) return;
+
+            switch (e.key.toLowerCase()) {
+                // Alt+S — Global Search
+                case 's': {
+                    e.preventDefault();
+                    searchRef.current?.focus();
+                    if (sidebarCollapsed) setSidebarCollapsed(false); // ensure sidebar visible
+                    showToast('🔍 Global Search (Alt+S)');
+                    break;
+                }
+                // Alt+B — Toggle Sidebar
+                case 'b': {
+                    if (isTyping) break;
+                    e.preventDefault();
+                    // Mobile: toggle drawer; Desktop: collapse sidebar
+                    if (window.innerWidth < 768) {
+                        setMobileMenuOpen(v => !v);
+                    } else {
+                        setSidebarCollapsed(v => !v);
+                    }
+                    showToast('☰ Sidebar Toggled (Alt+B)');
+                    break;
+                }
+                // Alt+R — Read Aloud
+                case 'r': {
+                    if (isTyping) break;
+                    e.preventDefault();
+                    if (!('speechSynthesis' in window)) {
+                        showToast('⚠ Speech not supported in this browser');
+                        break;
+                    }
+                    if (readingAloud) {
+                        window.speechSynthesis.cancel();
+                        setReadingAloud(false);
+                        showToast('🔇 Read Aloud stopped (Alt+R)');
+                    } else {
+                        const text = mainRef.current?.innerText || document.body.innerText;
+                        const utterance = new SpeechSynthesisUtterance(text.substring(0, 8000));
+                        utterance.rate = 1;
+                        utterance.onend = () => setReadingAloud(false);
+                        utterance.onerror = () => setReadingAloud(false);
+                        speechRef.current = utterance;
+                        window.speechSynthesis.speak(utterance);
+                        setReadingAloud(true);
+                        showToast('🔊 Reading aloud… (Alt+R to stop)');
+                    }
+                    break;
+                }
+                // Alt+H — High Contrast Toggle
+                case 'h': {
+                    if (isTyping) break;
+                    e.preventDefault();
+                    setHighContrast(!highContrast);
+                    showToast(highContrast ? '🌙 High Contrast off (Alt+H)' : '⚡ High Contrast on (Alt+H)');
+                    break;
+                }
+            }
+        }
+
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [highContrast, setHighContrast, readingAloud, sidebarCollapsed, showToast]);
+
+    // Stop reading aloud on route change
+    useEffect(() => {
+        window.speechSynthesis?.cancel();
+        setReadingAloud(false);
+    }, [pathname]);
+
     const handleLogout = () => {
+        window.speechSynthesis?.cancel();
         const isNgo = user?.role === 'ngo' || user?.role === 'admin';
         logout();
         router.push(isNgo ? '/ngo' : '/login');
@@ -300,7 +425,15 @@ export default function DashboardLayout({
     return (
         <div className="min-h-screen bg-slate-50 font-sans">
             {/* Desktop sidebar */}
-            <Sidebar userInitials={userInitials} userName={userName} userTier={userTier} items={navItems} onLogout={handleLogout} />
+            <Sidebar
+                userInitials={userInitials}
+                userName={userName}
+                userTier={userTier}
+                items={navItems}
+                onLogout={handleLogout}
+                collapsed={sidebarCollapsed}
+                searchRef={searchRef}
+            />
 
             {/* Mobile top bar */}
             <MobileTopBar
@@ -320,10 +453,41 @@ export default function DashboardLayout({
                 onLogout={handleLogout}
             />
 
-            {/* Main content */}
-            <main className="md:ml-52 min-h-screen">
+            {/* Main content — shift based on sidebar width */}
+            <main
+                ref={mainRef}
+                id="main-content"
+                className={`min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-52'
+                    }`}
+            >
                 {children}
             </main>
-        </div >
+
+            {/* ── Shortcut Toast HUD ────────────────────── */}
+            {shortcutToast && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-fade-in-up pointer-events-none"
+                >
+                    {shortcutToast}
+                </div>
+            )}
+
+            {/* ── Read Aloud indicator ──────────────────── */}
+            {readingAloud && (
+                <button
+                    onClick={() => { window.speechSynthesis.cancel(); setReadingAloud(false); }}
+                    aria-label="Stop reading aloud"
+                    className="fixed bottom-6 right-6 z-[9999] bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-pulse transition-colors"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                        <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+                    </svg>
+                    Stop Reading
+                </button>
+            )}
+        </div>
     );
 }

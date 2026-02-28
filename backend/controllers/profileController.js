@@ -92,3 +92,47 @@ exports.patchAccessibility = asyncHandler(async (req, res) => {
 
     res.json({ accessibilityPreferences: profile.accessibilityPreferences });
 });
+
+/* ── PATCH /api/profile/me ────────────────────────────────────────────────
+   Updates: name (User), bio + phone (AccessibilityProfile), optional password.
+*/
+exports.updateProfile = asyncHandler(async (req, res) => {
+    const { name, bio, phone, currentPassword, newPassword } = req.body;
+
+    // 1. Password change
+    if (currentPassword && newPassword) {
+        const user = await User.findById(req.user._id).select('+password');
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+        const match = await user.comparePassword(currentPassword);
+        if (!match) return res.status(400).json({ error: 'Current password is incorrect.' });
+        if (newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+        if (name && name.trim()) user.name = name.trim();
+        user.password = newPassword; // hashed by pre-save hook
+        await user.save();
+    } else if (name && name.trim()) {
+        await User.findByIdAndUpdate(req.user._id, { name: name.trim() }, { runValidators: true });
+    }
+
+    // 2. bio + phone on AccessibilityProfile
+    const profileSet = {};
+    if (bio !== undefined) profileSet.bio = bio.trim();
+    if (phone !== undefined) profileSet.contactNumber = phone.trim();
+    if (Object.keys(profileSet).length) {
+        await AccessibilityProfile.findOneAndUpdate(
+            { userId: req.user._id },
+            { $set: profileSet },
+            { upsert: true, new: true }
+        );
+    }
+
+    const updatedUser = await User.findById(req.user._id).select('name email role');
+    const updatedProfile = await AccessibilityProfile.findOne({ userId: req.user._id });
+
+    res.json({
+        message: 'Profile updated successfully.',
+        user: updatedUser,
+        bio: updatedProfile?.bio || '',
+        phone: updatedProfile?.contactNumber || '',
+    });
+});
+
