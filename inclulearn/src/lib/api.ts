@@ -73,6 +73,12 @@ export const coursesApi = {
   progress: () => request('/api/courses/progress'),
 };
 
+/* ── Feedback ─────────────────────────────────────── */
+export const feedbackApi = {
+  submit: (payload: Record<string, unknown>) => request('/api/feedback', { method: 'POST', body: payload }),
+  list: () => request<unknown[]>('/api/feedback'),
+};
+
 /* ── Types ────────────────────────────────────────── */
 export type AuthUser = {
   id: string;

@@ -5,11 +5,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UserIcon, MessageSquare } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 /* ── Types ───────────────────────────────────────── */
 export interface NavItemType {
     label: string;
-    icon: any;
+    icon: React.ElementType;
     href: string;
     onClick?: () => void;
     isActive?: boolean;
@@ -83,6 +84,7 @@ const defaultNavItems: NavItemType[] = [
     { label: 'All Courses', icon: BookIcon, href: '/allcourses' },
     { label: 'Progress', icon: BarIcon, href: '/progress' },
     { label: 'Messages', icon: MessageSquare, href: '/messages' },
+    { label: 'Feedback', icon: MessageSquare, href: '/feedback' },
     { label: 'Settings', icon: GearIcon, href: '/settings' },
     { label: 'Profile', icon: UserIcon, href: '/profile' },
 ];
@@ -95,9 +97,7 @@ function Sidebar({ userInitials, userName, userTier, items, onLogout }: { userIn
         <aside className="hidden md:flex flex-col w-52 min-h-screen bg-white mobile-drawer-bg border-r border-slate-200 py-6 px-3 fixed left-0 top-0 z-40">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 px-3 mb-8 text-slate-900 font-extrabold text-lg tracking-tight">
-                <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white shrink-0">
-                    <LogoIcon />
-                </div>
+                <Logo className="w-8 h-8 text-blue-600" />
                 EduAble
             </Link>
 
@@ -161,9 +161,7 @@ function MobileTopBar({ userInitials, onMenuToggle, menuOpen }: { userInitials: 
     return (
         <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white mobile-drawer-bg border-b border-slate-200 sticky top-0 z-30">
             <Link href="/" className="flex items-center gap-2 text-slate-900 font-extrabold tracking-tight">
-                <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-                    <LogoIcon />
-                </div>
+                <Logo className="w-7 h-7 text-blue-600" />
                 <span className="text-base">EduAble</span>
             </Link>
             <div className="flex items-center gap-3">

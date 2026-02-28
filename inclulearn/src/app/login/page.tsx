@@ -4,6 +4,7 @@ import { useState, useId } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authApi } from '@/lib/api';
+import Logo from '@/components/Logo';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
@@ -50,14 +51,10 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <a href="/" className="inline-flex items-center gap-2 text-primary font-extrabold text-2xl">
-                        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M4 7h16M4 12h12M4 17h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-                            </svg>
-                        </div>
+                    <Link href="/" className="inline-flex items-center gap-2 text-primary font-extrabold text-2xl">
+                        <Logo className="w-10 h-10 text-primary" />
                         EduAble
-                    </a>
+                    </Link>
                     <h1 className="text-2xl font-extrabold text-foreground mt-6 mb-1">Welcome back</h1>
                     <p className="text-sm text-muted-foreground">Sign in to continue your accessible learning journey.</p>
                 </div>

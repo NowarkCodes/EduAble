@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type { GestureId } from '@/components/GestureEngine';
+import FeedbackModal from '@/components/FeedbackModal';
 
 // ─── Gesture & Sign Language — lazy-loaded (code-split, zero cost when unused)
 const GestureEngine = dynamic(() => import('@/components/GestureEngine'), { ssr: false });
@@ -177,9 +178,13 @@ export default function CourseDetailPage() {
     const [isEnrolling, setIsEnrolling] = useState(false);
     const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
     const [isFetchingVideo, setIsFetchingVideo] = useState(false);
+    const [playedPercentage, setPlayedPercentage] = useState(0);
 
     // Mobile transcript accordion
     const [transcriptOpen, setTranscriptOpen] = useState(false);
+
+    // Feedback Modal State
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -328,6 +333,7 @@ export default function CourseDetailPage() {
 
     useEffect(() => {
         if (videoRef.current) videoRef.current.load();
+        setPlayedPercentage(0);
     }, [currentLessonIdx]);
 
     // ── Derived ───────────────────────────────────────────────────────────────
@@ -360,6 +366,19 @@ export default function CourseDetailPage() {
             console.error('Failed to complete lesson:', err);
         }
     }, [token, id, currentLesson]);
+
+    // ── Watch Progress Tracking ───────────────────────────────────────────────
+
+    const handleTimeUpdate = useCallback(() => {
+        const v = videoRef.current;
+        if (!v || !v.duration) return;
+        const pct = Math.round((v.currentTime / v.duration) * 100);
+        setPlayedPercentage(pct);
+        // Auto-complete at 90%
+        if (pct >= 90 && currentLesson && !currentLesson.completed) {
+            handleCompleteLesson();
+        }
+    }, [currentLesson, handleCompleteLesson]);
 
     const goToLesson = (idx: number) => {
         setCurrentLessonIdx(idx);
@@ -414,394 +433,434 @@ export default function CourseDetailPage() {
 
     // ─── Render ───────────────────────────────────────────────────────────────
 
-    return (<>
-        <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 md:py-8">
+    return (
+        <>
+            <DashboardLayout userInitials={initials} userName={user?.name ?? 'User'} userTier="Standard Account">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 md:py-8">
 
-                {/* Breadcrumb */}
-                <nav className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold text-slate-500 mb-4 sm:mb-6 uppercase tracking-wider flex-wrap min-w-0">
-                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors shrink-0">Dashboard</Link>
-                    <span aria-hidden="true">›</span>
-                    <Link href="/allcourses" className="hover:text-blue-600 transition-colors shrink-0 hidden sm:inline">All Courses</Link>
-                    <span aria-hidden="true" className="hidden sm:inline">›</span>
-                    <span className="text-slate-900 truncate">{course?.title ?? 'Loading…'}</span>
-                </nav>
+                    {/* Breadcrumb */}
+                    <nav className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold text-slate-500 mb-4 sm:mb-6 uppercase tracking-wider flex-wrap min-w-0">
+                        <Link href="/dashboard" className="hover:text-blue-600 transition-colors shrink-0">Dashboard</Link>
+                        <span aria-hidden="true">›</span>
+                        <Link href="/allcourses" className="hover:text-blue-600 transition-colors shrink-0 hidden sm:inline">All Courses</Link>
+                        <span aria-hidden="true" className="hidden sm:inline">›</span>
+                        <span className="text-slate-900 truncate">{course?.title ?? 'Loading…'}</span>
+                    </nav>
 
-                {isLoading ? (
-                    <Skeleton />
-                ) : error ? (
-                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-6 sm:p-8 text-center">
-                        <p className="text-base sm:text-lg font-bold mb-2">Could not load course</p>
-                        <p className="text-sm">{error}</p>
-                        <Link href="/allcourses" className="mt-4 inline-block text-blue-600 font-bold hover:underline text-sm">← Back to All Courses</Link>
-                    </div>
-                ) : course ? (
-                    <>
-                        {/* Header */}
-                        <header className="mb-4 sm:mb-6">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
-                                <span className="bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full uppercase tracking-wider">{course.level}</span>
-                                <span className="bg-slate-100 text-slate-600 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full">{course.category}</span>
-                                {isEnrolling && <span className="text-xs text-slate-400 italic">Enrolling…</span>}
-                                {enrollment && (
-                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full">
-                                        ✓ Enrolled · {enrollment.progressPercentage}% complete
-                                    </span>
-                                )}
-                            </div>
-                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 mb-1">{course.title}</h1>
-                            <p className="text-slate-500 font-medium text-sm">By {course.instructorName}</p>
-                        </header>
-
-                        <div className="flex flex-col xl:flex-row gap-5 sm:gap-6">
-
-                            {/* ── Left Column ──────────────────────────────────── */}
-                            <div className="flex-1 min-w-0 flex flex-col gap-5 sm:gap-6">
-
-                                {/* Video Player */}
-                                <div className="bg-black rounded-2xl overflow-hidden shadow-md">
-                                    {isFetchingVideo ? (
-                                        <div className="aspect-video flex flex-col items-center justify-center gap-3 bg-slate-900 text-slate-400">
-                                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin" />
-                                            <p className="text-xs sm:text-sm font-semibold">Loading video…</p>
-                                        </div>
-                                    ) : playbackUrl ? (
-                                        <video
-                                            key={playbackUrl}
-                                            ref={videoRef}
-                                            controls
-                                            autoPlay={false}
-                                            className="w-full max-h-[56vw] sm:max-h-[480px] lg:max-h-[560px] rounded-2xl bg-black"
-                                            controlsList="nodownload"
-                                            onLoadedMetadata={handleLoadedMetadata}
-                                            onEnded={handleCompleteLesson}
-                                            aria-label={`Video: ${currentLesson?.title}`}
-                                            onError={() => { setPlaybackUrl(null); setIsFetchingVideo(false); }}
-                                        >
-                                            <source src={playbackUrl} type="video/mp4" />
-                                            <source src={playbackUrl} type="video/webm" />
-                                            <track kind="captions" label="Auto-generated captions" default />
-                                            <p className="text-white p-4 text-sm">
-                                                Your browser does not support the video element.{' '}
-                                                <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
-                                            </p>
-                                        </video>
-                                    ) : currentLesson?.videoUrl ? (
-                                        <div className="aspect-video flex flex-col items-center justify-center gap-3 sm:gap-4 bg-slate-900 text-slate-300 p-4">
-                                            <VideoIcon />
-                                            <p className="font-semibold text-sm text-center">Could not load video player.</p>
-                                            <a href={currentLesson.videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline text-xs">
-                                                Try opening video directly ↗
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <div className="aspect-video flex flex-col items-center justify-center gap-3 sm:gap-4 bg-slate-900 text-slate-400 p-4">
-                                            <VideoIcon />
-                                            <p className="font-semibold text-sm text-center">No video available for this lesson yet.</p>
-                                        </div>
+                    {isLoading ? (
+                        <Skeleton />
+                    ) : error ? (
+                        <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-6 sm:p-8 text-center">
+                            <p className="text-base sm:text-lg font-bold mb-2">Could not load course</p>
+                            <p className="text-sm">{error}</p>
+                            <Link href="/allcourses" className="mt-4 inline-block text-blue-600 font-bold hover:underline text-sm">← Back to All Courses</Link>
+                        </div>
+                    ) : course ? (
+                        <>
+                            {/* Header */}
+                            <header className="mb-4 sm:mb-6">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                                    <span className="bg-blue-100 text-blue-700 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full uppercase tracking-wider">{course.level}</span>
+                                    <span className="bg-slate-100 text-slate-600 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full">{course.category}</span>
+                                    {isEnrolling && <span className="text-xs text-slate-400 italic">Enrolling…</span>}
+                                    {enrollment && (
+                                        <span className="bg-emerald-100 text-emerald-700 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full">
+                                            ✓ Enrolled · {enrollment.progressPercentage}% complete
+                                        </span>
                                     )}
                                 </div>
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 mb-1">{course.title}</h1>
+                                <p className="text-slate-500 font-medium text-sm">By {course.instructorName}</p>
+                            </header>
 
-                                {/* Mobile transcript accordion — hidden on xl */}
-                                <div className="xl:hidden">
-                                    <button
-                                        onClick={() => setTranscriptOpen(prev => !prev)}
-                                        aria-expanded={transcriptOpen}
-                                        className={`w-full flex items-center justify-between p-4 rounded-2xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${transcriptOpen ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                            </svg>
-                                            Lesson Transcript
-                                        </span>
-                                        <ChevronIcon className={`transition-transform ${transcriptOpen ? 'rotate-180' : ''}`} />
-                                    </button>
+                            <div className="flex flex-col xl:flex-row gap-5 sm:gap-6">
 
-                                    {transcriptOpen && (
-                                        <div className="mt-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden max-h-72 flex flex-col">
-                                            <TranscriptPanel lesson={currentLesson} />
-                                        </div>
-                                    )}
-                                </div>
+                                {/* ── Left Column ──────────────────────────────────── */}
+                                <div className="flex-1 min-w-0 flex flex-col gap-5 sm:gap-6">
 
-                                {/* Lesson Notes / Description */}
-                                <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 md:p-6 shadow-sm">
-                                    <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
-                                        <FileTextIcon />
-                                        <span className="truncate">
-                                            {currentLesson ? `Lesson ${currentLesson.order}: ${currentLesson.title}` : 'Course Overview'}
-                                        </span>
-                                    </h2>
-                                    <div className="text-sm text-slate-600 leading-relaxed space-y-3">
-                                        <p>{course.description}</p>
-                                        {currentLesson?.notesMarkdown && (
-                                            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100">
-                                                <p className="font-bold text-slate-700 mb-2">Lesson Notes:</p>
-                                                <p className="whitespace-pre-line">{currentLesson.notesMarkdown}</p>
+                                    {/* Video Player */}
+                                    <div className="bg-black rounded-2xl overflow-hidden shadow-md">
+                                        {isFetchingVideo ? (
+                                            <div className="aspect-video flex flex-col items-center justify-center gap-3 bg-slate-900 text-slate-400">
+                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin" />
+                                                <p className="text-xs sm:text-sm font-semibold">Loading video…</p>
+                                            </div>
+                                        ) : playbackUrl ? (
+                                            <div className="relative">
+                                                <video
+                                                    key={playbackUrl}
+                                                    ref={videoRef}
+                                                    controls
+                                                    autoPlay={false}
+                                                    className="w-full max-h-[56vw] sm:max-h-[480px] lg:max-h-[560px] rounded-2xl bg-black"
+                                                    controlsList="nodownload"
+                                                    onLoadedMetadata={handleLoadedMetadata}
+                                                    onTimeUpdate={handleTimeUpdate}
+                                                    onEnded={handleCompleteLesson}
+                                                    aria-label={`Video: ${currentLesson?.title}`}
+                                                    onError={() => { setPlaybackUrl(null); setIsFetchingVideo(false); }}
+                                                >
+                                                    <source src={playbackUrl} type="video/mp4" />
+                                                    <source src={playbackUrl} type="video/webm" />
+                                                    <track kind="captions" label="Auto-generated captions" default />
+                                                    <p className="text-white p-4 text-sm">
+                                                        Your browser does not support the video element.{' '}
+                                                        <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
+                                                    </p>
+                                                </video>
+
+                                                {/* Watch Progress Bar */}
+                                                {currentLesson && (
+                                                    <div className="bg-slate-900 text-slate-300 text-xs px-4 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto min-w-0">
+                                                            <span className="font-bold text-blue-400 whitespace-nowrap">Watch Progress: {playedPercentage}%</span>
+                                                            <div className="w-full sm:w-48 lg:w-64 h-2 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                                                                <div className="h-full bg-blue-500 transition-all duration-300 origin-left" style={{ width: `${playedPercentage}%` }} />
+                                                            </div>
+                                                        </div>
+                                                        {currentLesson.completed ? (
+                                                            <span className="text-emerald-400 font-bold flex items-center gap-1.5 bg-emerald-400/10 px-3 py-1.5 rounded-full shrink-0">
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                Lesson Completed!
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-500 font-medium shrink-0 animate-pulse">Watch 90% to complete</span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : currentLesson?.videoUrl ? (
+                                            <div className="aspect-video flex flex-col items-center justify-center gap-3 sm:gap-4 bg-slate-900 text-slate-300 p-4">
+                                                <VideoIcon />
+                                                <p className="font-semibold text-sm text-center">Could not load video player.</p>
+                                                <a href={currentLesson.videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline text-xs">
+                                                    Try opening video directly ↗
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <div className="aspect-video flex flex-col items-center justify-center gap-3 sm:gap-4 bg-slate-900 text-slate-400 p-4">
+                                                <VideoIcon />
+                                                <p className="font-semibold text-sm text-center">No video available for this lesson yet.</p>
                                             </div>
                                         )}
                                     </div>
-                                    {course.accessibilityTags?.length > 0 && (
-                                        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100 flex flex-wrap gap-1.5 sm:gap-2">
-                                            {course.accessibilityTags.map(tag => (
-                                                <span key={tag} className="bg-blue-50 text-blue-600 border border-blue-100 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
-                                                    {tag.replace(/-/g, ' ')}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                </section>
 
-                                {/* Nav buttons */}
-                                <div className="flex items-center justify-between gap-3">
-                                    <button
-                                        onClick={() => hasPrev && goToLesson(currentLessonIdx - 1)}
-                                        disabled={!hasPrev}
-                                        className="flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 sm:py-3 px-3.5 sm:px-5 rounded-xl transition-colors text-xs sm:text-sm shadow-sm disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180 shrink-0">
-                                            <line x1="5" y1="12" x2="19" y2="12" />
-                                            <polyline points="12 5 19 12 12 19" />
-                                        </svg>
-                                        <span className="hidden xs:inline">Previous </span>Lesson
-                                    </button>
-
-                                    {hasNext ? (
+                                    {/* Mobile transcript accordion — hidden on xl */}
+                                    <div className="xl:hidden">
                                         <button
-                                            onClick={() => goToLesson(currentLessonIdx + 1)}
-                                            className="flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                                            onClick={() => setTranscriptOpen(prev => !prev)}
+                                            aria-expanded={transcriptOpen}
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${transcriptOpen ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}
                                         >
-                                            Next Lesson
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                            <span className="flex items-center gap-2">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                                </svg>
+                                                Lesson Transcript
+                                            </span>
+                                            <ChevronIcon className={`transition-transform ${transcriptOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {transcriptOpen && (
+                                            <div className="mt-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden max-h-72 flex flex-col">
+                                                <TranscriptPanel lesson={currentLesson} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Lesson Notes / Description */}
+                                    <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 md:p-6 shadow-sm">
+                                        <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
+                                            <FileTextIcon />
+                                            <span className="truncate">
+                                                {currentLesson ? `Lesson ${currentLesson.order}: ${currentLesson.title}` : 'Course Overview'}
+                                            </span>
+                                        </h2>
+                                        <div className="text-sm text-slate-600 leading-relaxed space-y-3">
+                                            <p>{course.description}</p>
+                                            {currentLesson?.notesMarkdown && (
+                                                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100">
+                                                    <p className="font-bold text-slate-700 mb-2">Lesson Notes:</p>
+                                                    <p className="whitespace-pre-line">{currentLesson.notesMarkdown}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {course.accessibilityTags?.length > 0 && (
+                                            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100 flex flex-wrap gap-1.5 sm:gap-2">
+                                                {course.accessibilityTags.map(tag => (
+                                                    <span key={tag} className="bg-blue-50 text-blue-600 border border-blue-100 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+                                                        {tag.replace(/-/g, ' ')}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </section>
+
+                                    {/* Nav buttons */}
+                                    <div className="flex items-center justify-between gap-3">
+                                        <button
+                                            onClick={() => hasPrev && goToLesson(currentLessonIdx - 1)}
+                                            disabled={!hasPrev}
+                                            className="flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 sm:py-3 px-3.5 sm:px-5 rounded-xl transition-colors text-xs sm:text-sm shadow-sm disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180 shrink-0">
                                                 <line x1="5" y1="12" x2="19" y2="12" />
                                                 <polyline points="12 5 19 12 12 19" />
                                             </svg>
+                                            <span className="hidden xs:inline">Previous </span>Lesson
                                         </button>
-                                    ) : (
-                                        <span className="flex items-center gap-1.5 sm:gap-2 bg-emerald-600 text-white font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl text-xs sm:text-sm shadow-sm">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                                                <polyline points="20 6 9 17 4 12" />
-                                            </svg>
-                                            Course Complete!
-                                        </span>
-                                    )}
-                                </div>
 
-                                {/* Lessons list */}
-                                <section>
-                                    <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4">
-                                        Course Content ({lessons.length} lessons)
-                                    </h2>
-                                    <div className="space-y-2 sm:space-y-3">
-                                        {lessons.map((lesson, idx) => {
-                                            const isActive = idx === currentLessonIdx;
-                                            const isDone = lesson.completed;
-                                            return (
+                                        {hasNext ? (
+                                            <button
+                                                onClick={() => goToLesson(currentLessonIdx + 1)}
+                                                className="flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                                            >
+                                                Next Lesson
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                                    <polyline points="12 5 19 12 12 19" />
+                                                </svg>
+                                            </button>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="flex items-center gap-1.5 sm:gap-2 bg-emerald-600 text-white font-bold py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl text-xs sm:text-sm shadow-sm">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                                        <polyline points="20 6 9 17 4 12" />
+                                                    </svg>
+                                                    Course Complete!
+                                                </span>
                                                 <button
-                                                    key={lesson.id}
-                                                    onClick={() => goToLesson(idx)}
-                                                    className={`w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border-2 text-left transition-all ${isActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'}`}
+                                                    onClick={() => setIsFeedbackOpen(true)}
+                                                    className="flex items-center gap-1.5 sm:gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl transition-colors text-xs sm:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
                                                 >
-                                                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                                                        {isDone ? (
-                                                            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
-                                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                            </div>
-                                                        ) : isActive ? (
-                                                            <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">{lesson.order}</div>
-                                                        ) : (
-                                                            <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">{lesson.order}</div>
-                                                        )}
-                                                        <span className={`font-semibold truncate text-sm ${isActive ? 'text-blue-700' : isDone ? 'text-slate-900' : 'text-slate-600'}`}>
-                                                            {lesson.title}
-                                                        </span>
-                                                    </div>
-                                                    <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 ml-2 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
-                                                        {isActive ? 'Playing' : lesson.duration ? formatDuration(lesson.duration) : '--:--'}
-                                                    </span>
+                                                    Leave Feedback
                                                 </button>
-                                            );
-                                        })}
-
-                                        {lessons.length === 0 && (
-                                            <p className="text-slate-400 text-sm italic p-4 text-center">No lessons have been added to this course yet.</p>
+                                            </div>
                                         )}
                                     </div>
-                                </section>
-                            </div>
 
-                            {/* ── Right Column — desktop only (xl+) ──────────────── */}
-                            <div className="hidden xl:flex xl:w-[380px] shrink-0 flex-col gap-6">
+                                    {/* Lessons list */}
+                                    <section>
+                                        <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-3 sm:mb-4">
+                                            Course Content ({lessons.length} lessons)
+                                        </h2>
+                                        <div className="space-y-2 sm:space-y-3">
+                                            {lessons.map((lesson, idx) => {
+                                                const isActive = idx === currentLessonIdx;
+                                                const isDone = lesson.completed;
+                                                return (
+                                                    <button
+                                                        key={lesson.id}
+                                                        onClick={() => goToLesson(idx)}
+                                                        className={`w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border-2 text-left transition-all ${isActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'}`}
+                                                    >
+                                                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                                                            {isDone ? (
+                                                                <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
+                                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                </div>
+                                                            ) : isActive ? (
+                                                                <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">{lesson.order}</div>
+                                                            ) : (
+                                                                <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">{lesson.order}</div>
+                                                            )}
+                                                            <span className={`font-semibold truncate text-sm ${isActive ? 'text-blue-700' : isDone ? 'text-slate-900' : 'text-slate-600'}`}>
+                                                                {lesson.title}
+                                                            </span>
+                                                        </div>
+                                                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 ml-2 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                            {isActive ? 'Playing' : lesson.duration ? formatDuration(lesson.duration) : '--:--'}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
 
-                                {/* Transcript Card */}
-                                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[540px] overflow-hidden">
-                                    <header className="bg-blue-600 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <h2 className="font-bold text-sm sm:text-base leading-snug">Lesson Transcript</h2>
-                                                <p className="text-[9px] font-bold text-blue-200 tracking-widest uppercase mt-0.5">Auto-generated • Accessibility</p>
-                                            </div>
+                                            {lessons.length === 0 && (
+                                                <p className="text-slate-400 text-sm italic p-4 text-center">No lessons have been added to this course yet.</p>
+                                            )}
                                         </div>
-                                        <div className="flex gap-1 sm:gap-1.5 text-blue-200">
-                                            <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript">
-                                                <DownloadIcon />
-                                            </button>
-                                            <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Search transcript">
-                                                <SearchInputIcon />
-                                            </button>
-                                        </div>
-                                    </header>
-                                    <TranscriptPanel lesson={currentLesson} />
-                                </section>
-
-                                {/* Course Details */}
-                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
-                                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                                        <LightningIcon />
-                                        Course Details
-                                    </h3>
-                                    <div className="space-y-2.5 sm:space-y-3 text-sm">
-                                        {[
-                                            { label: 'Total Lessons', value: course.totalLessons },
-                                            { label: 'Total Duration', value: `${calculatedTotalDuration || course.totalDuration} min` },
-                                            { label: 'Current Lesson', value: currentLesson?.duration ? formatDuration(currentLesson.duration) : '--:--' },
-                                            { label: 'Level', value: course.level },
-                                            { label: 'Category', value: course.category },
-                                            { label: 'Instructor', value: course.instructorName },
-                                        ].map(({ label, value }) => (
-                                            <div key={label} className="flex justify-between gap-2">
-                                                <span className="text-slate-500">{label}</span>
-                                                <span className="font-bold text-slate-900 text-right truncate max-w-[55%]">{value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {enrollment && (
-                                        <div className="pt-3 sm:pt-4 border-t border-slate-100">
-                                            <div className="flex justify-between text-xs font-bold mb-1.5">
-                                                <span className="text-slate-600">Your Progress</span>
-                                                <span className="text-blue-700">{enrollment.progressPercentage}%</span>
-                                            </div>
-                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-blue-600 rounded-full transition-all"
-                                                    style={{ width: `${enrollment.progressPercentage}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
+                                    </section>
                                 </div>
 
-                                {/* Mobile course details — show as separate section below lessons on mobile */}
-                            </div>
-                        </div>
+                                {/* ── Right Column — desktop only (xl+) ──────────────── */}
+                                <div className="hidden xl:flex xl:w-[380px] shrink-0 flex-col gap-6">
 
-                        {/* Course Details card for mobile/tablet (below lessons, hidden on xl) */}
-                        <div className="xl:hidden mt-5 sm:mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3 sm:space-y-4">
-                            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                                <LightningIcon />
-                                Course Details
-                            </h3>
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
-                                {[
-                                    { label: 'Total Lessons', value: course.totalLessons },
-                                    { label: 'Total Duration', value: `${calculatedTotalDuration || course.totalDuration} min` },
-                                    { label: 'Current Lesson', value: currentLesson?.duration ? formatDuration(currentLesson.duration) : '--:--' },
-                                    { label: 'Level', value: course.level },
-                                    { label: 'Category', value: course.category },
-                                    { label: 'Instructor', value: course.instructorName },
-                                ].map(({ label, value }) => (
-                                    <div key={label} className="flex flex-col gap-0.5">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-                                        <span className="font-bold text-slate-900 text-sm truncate">{value}</span>
+                                    {/* Transcript Card */}
+                                    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[540px] overflow-hidden">
+                                        <header className="bg-blue-600 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <h2 className="font-bold text-sm sm:text-base leading-snug">Lesson Transcript</h2>
+                                                    <p className="text-[9px] font-bold text-blue-200 tracking-widest uppercase mt-0.5">Auto-generated • Accessibility</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1 sm:gap-1.5 text-blue-200">
+                                                <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Download transcript">
+                                                    <DownloadIcon />
+                                                </button>
+                                                <button className="p-1.5 sm:p-2 hover:text-white transition-colors hover:bg-blue-500 rounded-lg" aria-label="Search transcript">
+                                                    <SearchInputIcon />
+                                                </button>
+                                            </div>
+                                        </header>
+                                        <TranscriptPanel lesson={currentLesson} />
+                                    </section>
+
+                                    {/* Course Details */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
+                                        <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                            <LightningIcon />
+                                            Course Details
+                                        </h3>
+                                        <div className="space-y-2.5 sm:space-y-3 text-sm">
+                                            {[
+                                                { label: 'Total Lessons', value: course.totalLessons },
+                                                { label: 'Total Duration', value: `${calculatedTotalDuration || course.totalDuration} min` },
+                                                { label: 'Current Lesson', value: currentLesson?.duration ? formatDuration(currentLesson.duration) : '--:--' },
+                                                { label: 'Level', value: course.level },
+                                                { label: 'Category', value: course.category },
+                                                { label: 'Instructor', value: course.instructorName },
+                                            ].map(({ label, value }) => (
+                                                <div key={label} className="flex justify-between gap-2">
+                                                    <span className="text-slate-500">{label}</span>
+                                                    <span className="font-bold text-slate-900 text-right truncate max-w-[55%]">{value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {enrollment && (
+                                            <div className="pt-3 sm:pt-4 border-t border-slate-100">
+                                                <div className="flex justify-between text-xs font-bold mb-1.5">
+                                                    <span className="text-slate-600">Your Progress</span>
+                                                    <span className="text-blue-700">{enrollment.progressPercentage}%</span>
+                                                </div>
+                                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-blue-600 rounded-full transition-all"
+                                                        style={{ width: `${enrollment.progressPercentage}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                            {enrollment && (
-                                <div className="pt-3 border-t border-slate-100">
-                                    <div className="flex justify-between text-xs font-bold mb-1.5">
-                                        <span className="text-slate-600">Your Progress</span>
-                                        <span className="text-blue-700">{enrollment.progressPercentage}%</span>
-                                    </div>
-                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${enrollment.progressPercentage}%` }} />
-                                    </div>
+
+                                    {/* Mobile course details — show as separate section below lessons on mobile */}
                                 </div>
-                            )}
-                        </div>
-                    </>
-                ) : null}
+                            </div>
 
-            </div>
+                            {/* Course Details card for mobile/tablet (below lessons, hidden on xl) */}
+                            <div className="xl:hidden mt-5 sm:mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3 sm:space-y-4">
+                                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                    <LightningIcon />
+                                    Course Details
+                                </h3>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
+                                    {[
+                                        { label: 'Total Lessons', value: course.totalLessons },
+                                        { label: 'Total Duration', value: `${calculatedTotalDuration || course.totalDuration} min` },
+                                        { label: 'Current Lesson', value: currentLesson?.duration ? formatDuration(currentLesson.duration) : '--:--' },
+                                        { label: 'Level', value: course.level },
+                                        { label: 'Category', value: course.category },
+                                        { label: 'Instructor', value: course.instructorName },
+                                    ].map(({ label, value }) => (
+                                        <div key={label} className="flex flex-col gap-0.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+                                            <span className="font-bold text-slate-900 text-sm truncate">{value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {enrollment && (
+                                    <div className="pt-3 border-t border-slate-100">
+                                        <div className="flex justify-between text-xs font-bold mb-1.5">
+                                            <span className="text-slate-600">Your Progress</span>
+                                            <span className="text-blue-700">{enrollment.progressPercentage}%</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${enrollment.progressPercentage}%` }} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : null}
 
-            {/* Footer */}
-            <footer className="mt-8 sm:mt-12 py-6 sm:py-8 border-t border-slate-200 px-4">
-                <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-                    <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
-                        <span>© 2025 EduAble</span>
-                        <span className="hidden sm:inline">•</span>
-                        <Link href="#" className="hover:text-slate-600">Accessibility Statement</Link>
-                        <span className="hidden sm:inline">•</span>
-                        <Link href="#" className="hover:text-slate-600">Privacy Policy</Link>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shrink-0">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        <span>WCAG 2.2 AAA Compliant</span>
-                    </div>
                 </div>
-            </footer>
-        </DashboardLayout>
 
-        {/* ── Screen-reader live region for gesture announcements ─────────── */}
-        <div
-            id="gesture-sr-announce"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            className="sr-only"
-        />
+                {/* Footer */}
+                <footer className="mt-8 sm:mt-12 py-6 sm:py-8 border-t border-slate-200 px-4">
+                    <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                        <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+                            <span>© 2025 EduAble</span>
+                            <span className="hidden sm:inline">•</span>
+                            <Link href="#" className="hover:text-slate-600">Accessibility Statement</Link>
+                            <span className="hidden sm:inline">•</span>
+                            <Link href="#" className="hover:text-slate-600">Privacy Policy</Link>
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shrink-0">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>WCAG 2.2 AAA Compliant</span>
+                        </div>
+                    </div>
+                </footer>
+            </DashboardLayout>
 
-        {/* ── Gesture Engine (headless, zero render cost when disabled) ────── */}
-        {
-            gestureEnabled && (
-                <GestureEngine
-                    onGesture={handleGesture}
-                    cooldownMs={1500}
-                />
-            )
-        }
+            {/* ── Screen-reader live region for gesture announcements ─────────── */}
+            <div
+                id="gesture-sr-announce"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className="sr-only"
+            />
 
-        {/* ── Gesture HUD ──────────────────────────────────────────────────── */}
-        {
-            signPrefs?.gestureNavigationEnabled && (
-                <GestureHUD
-                    activeGesture={activeGesture}
-                    enabled={gestureEnabled}
-                    onToggle={() => setGestureEnabled(prev => !prev)}
-                    stream={gestureStreamRef.current}
-                />
-            )
-        }
+            {/* ── Gesture Engine (headless, zero render cost when disabled) ────── */}
+            {
+                gestureEnabled && (
+                    <GestureEngine
+                        onGesture={handleGesture}
+                        cooldownMs={1500}
+                    />
+                )
+            }
 
-        {/* ── Sign Language Overlay ────────────────────────────────────────── */}
-        {
-            showSignOverlay && (
-                <SignOverlayPlayer
-                    mainVideoRef={videoRef}
-                    vttUrl={currentLesson!.signLanguageVttUrl!}
-                    preferredLanguage={signPrefs!.preferredSignLanguage as 'ISL' | 'ASL'}
-                    position={signPrefs!.signOverlayPosition as 'top-left' | 'bottom-left' | 'floating'}
-                    backendUrl={BACKEND}
-                    token={token}
-                />
-            )
-        }
-    </>);
+            {/* ── Gesture HUD ──────────────────────────────────────────────────── */}
+            {
+                signPrefs?.gestureNavigationEnabled && (
+                    <GestureHUD
+                        activeGesture={activeGesture}
+                        enabled={gestureEnabled}
+                        onToggle={() => setGestureEnabled(prev => !prev)}
+                        stream={gestureStreamRef.current}
+                    />
+                )
+            }
+
+            {/* ── Sign Language Overlay ────────────────────────────────────────── */}
+            {
+                showSignOverlay && (
+                    <SignOverlayPlayer
+                        mainVideoRef={videoRef}
+                        vttUrl={currentLesson!.signLanguageVttUrl!}
+                        preferredLanguage={signPrefs!.preferredSignLanguage as 'ISL' | 'ASL'}
+                        position={signPrefs!.signOverlayPosition as 'top-left' | 'bottom-left' | 'floating'}
+                        backendUrl={BACKEND}
+                        token={token}
+                    />
+                )
+            }
+
+            {/* ── Feedback Modal ────────────────────────────────────────────────── */}
+            <FeedbackModal
+                isOpen={isFeedbackOpen}
+                onCloseAction={() => setIsFeedbackOpen(false)}
+                onSubmitAction={() => setIsFeedbackOpen(false)}
+            />
+        </>
+    );
 }
