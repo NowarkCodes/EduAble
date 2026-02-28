@@ -221,7 +221,7 @@ export default function MessagesPage() {
             setPollingInterval(null);
             setTypers([]);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedTicket?._id]);
 
     /* Auto-scroll */
