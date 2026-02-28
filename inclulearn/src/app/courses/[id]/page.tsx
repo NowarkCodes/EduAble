@@ -157,6 +157,10 @@ export default function CourseDetailPage() {
     const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
     const [isFetchingVideo, setIsFetchingVideo] = useState(false);
 
+    // Video tracking state
+    const [playedSeconds, setPlayedSeconds] = useState(0);
+    const [playedPercentage, setPlayedPercentage] = useState(0);
+
     // Mobile transcript accordion
     const [transcriptOpen, setTranscriptOpen] = useState(false);
 
@@ -279,6 +283,8 @@ export default function CourseDetailPage() {
 
     useEffect(() => {
         if (videoRef.current) videoRef.current.load();
+        setPlayedSeconds(0);
+        setPlayedPercentage(0);
     }, [currentLessonIdx]);
 
     // ── Derived ───────────────────────────────────────────────────────────────
@@ -311,6 +317,21 @@ export default function CourseDetailPage() {
             console.error('Failed to complete lesson:', err);
         }
     }, [token, id, currentLesson]);
+
+    const handleTimeUpdate = () => {
+        if (!videoRef.current || !currentLesson) return;
+        const { currentTime, duration } = videoRef.current;
+        if (duration > 0) {
+            setPlayedSeconds(currentTime);
+            const percentage = Math.round((currentTime / duration) * 100);
+            setPlayedPercentage(percentage);
+            
+            // Auto complete if watched > 90% or within last 2 seconds
+            if ((percentage >= 90 || duration - currentTime < 2) && !currentLesson.completed) {
+                handleCompleteLesson();
+            }
+        }
+    };
 
     const goToLesson = (idx: number) => {
         setCurrentLessonIdx(idx);
@@ -373,26 +394,49 @@ export default function CourseDetailPage() {
                                             <p className="text-xs sm:text-sm font-semibold">Loading video…</p>
                                         </div>
                                     ) : playbackUrl ? (
-                                        <video
-                                            key={playbackUrl}
-                                            ref={videoRef}
-                                            controls
-                                            autoPlay={false}
-                                            className="w-full max-h-[56vw] sm:max-h-[480px] lg:max-h-[560px] rounded-2xl bg-black"
-                                            controlsList="nodownload"
-                                            onLoadedMetadata={handleLoadedMetadata}
-                                            onEnded={handleCompleteLesson}
-                                            aria-label={`Video: ${currentLesson?.title}`}
-                                            onError={() => { setPlaybackUrl(null); setIsFetchingVideo(false); }}
-                                        >
-                                            <source src={playbackUrl} type="video/mp4" />
-                                            <source src={playbackUrl} type="video/webm" />
-                                            <track kind="captions" label="Auto-generated captions" default />
-                                            <p className="text-white p-4 text-sm">
-                                                Your browser does not support the video element.{' '}
-                                                <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
-                                            </p>
-                                        </video>
+                                        <div className="relative">
+                                            <video
+                                                key={playbackUrl}
+                                                ref={videoRef}
+                                                controls
+                                                autoPlay={false}
+                                                className="w-full max-h-[56vw] sm:max-h-[480px] lg:max-h-[560px] bg-black"
+                                                controlsList="nodownload"
+                                                onLoadedMetadata={handleLoadedMetadata}
+                                                onTimeUpdate={handleTimeUpdate}
+                                                onEnded={handleCompleteLesson}
+                                                aria-label={`Video: ${currentLesson?.title}`}
+                                                onError={() => { setPlaybackUrl(null); setIsFetchingVideo(false); }}
+                                            >
+                                                <source src={playbackUrl} type="video/mp4" />
+                                                <source src={playbackUrl} type="video/webm" />
+                                                <track kind="captions" label="Auto-generated captions" default />
+                                                <p className="text-white p-4 text-sm">
+                                                    Your browser does not support the video element.{' '}
+                                                    <a href={playbackUrl} className="text-blue-400 underline" target="_blank" rel="noopener noreferrer">Open video directly</a>
+                                                </p>
+                                            </video>
+                                            
+                                            {/* Custom Watch Progress Tracker Bar */}
+                                            {currentLesson && (
+                                                <div className="bg-slate-900 text-slate-300 text-xs px-4 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto min-w-0">
+                                                        <span className="font-bold text-blue-400 whitespace-nowrap">Watch Progress: {playedPercentage}%</span>
+                                                        <div className="w-full sm:w-48 lg:w-64 h-2 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                                                            <div className="h-full bg-blue-500 transition-all duration-300 origin-left" style={{ width: `${playedPercentage}%` }} />
+                                                        </div>
+                                                    </div>
+                                                    {currentLesson.completed ? (
+                                                        <span className="text-emerald-400 font-bold flex items-center gap-1.5 bg-emerald-400/10 px-3 py-1.5 rounded-full shrink-0">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> 
+                                                            Lesson Completed!
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-500 font-medium shrink-0 animate-pulse">Watch 90% to complete</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : currentLesson?.videoUrl ? (
                                         <div className="aspect-video flex flex-col items-center justify-center gap-3 sm:gap-4 bg-slate-900 text-slate-300 p-4">
                                             <VideoIcon />
