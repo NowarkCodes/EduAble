@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { UserIcon } from 'lucide-react';
+import { UserIcon, MessageSquare } from 'lucide-react';
 
 /* ── Types ───────────────────────────────────────── */
 export interface NavItemType {
@@ -82,20 +82,14 @@ const defaultNavItems: NavItemType[] = [
     { label: 'My Courses', icon: BookIcon, href: '/courses' },
     { label: 'All Courses', icon: BookIcon, href: '/allcourses' },
     { label: 'Progress', icon: BarIcon, href: '/progress' },
+    { label: 'Messages', icon: MessageSquare, href: '/messages' },
     { label: 'Settings', icon: GearIcon, href: '/settings' },
     { label: 'Profile', icon: UserIcon, href: '/profile' },
 ];
 
 /* ── Sidebar ─────────────────────────────────────── */
-function Sidebar({ userInitials, userName, userTier, items }: { userInitials: string; userName: string; userTier: string; items: NavItemType[] }) {
+function Sidebar({ userInitials, userName, userTier, items, onLogout }: { userInitials: string; userName: string; userTier: string; items: NavItemType[]; onLogout: () => void }) {
     const pathname = usePathname();
-    const { logout } = useAuth();
-    const router = useRouter();
-
-    function handleLogout() {
-        logout();
-        router.push('/login');
-    }
 
     return (
         <aside className="hidden md:flex flex-col w-52 min-h-screen bg-white mobile-drawer-bg border-r border-slate-200 py-6 px-3 fixed left-0 top-0 z-40">
@@ -151,7 +145,7 @@ function Sidebar({ userInitials, userName, userTier, items }: { userInitials: st
                     </div>
                 </div>
                 <button
-                    onClick={handleLogout}
+                    onClick={onLogout}
                     className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-sm font-semibold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
                 >
                     <LogoutIcon />
@@ -190,15 +184,8 @@ function MobileTopBar({ userInitials, onMenuToggle, menuOpen }: { userInitials: 
 }
 
 /* ── Mobile drawer ───────────────────────────────── */
-function MobileDrawer({ open, onClose, userInitials, userName, userTier, items }: { open: boolean; onClose: () => void; userInitials: string; userName: string; userTier: string; items: NavItemType[] }) {
+function MobileDrawer({ open, onClose, userInitials, userName, userTier, items, onLogout }: { open: boolean; onClose: () => void; userInitials: string; userName: string; userTier: string; items: NavItemType[]; onLogout: () => void }) {
     const pathname = usePathname();
-    const { logout } = useAuth();
-    const router = useRouter();
-
-    function handleLogout() {
-        logout();
-        router.push('/login');
-    }
 
     if (!open) return null;
     return (
@@ -262,7 +249,7 @@ function MobileDrawer({ open, onClose, userInitials, userName, userTier, items }
                 {/* Footer Section (Logout) */}
                 <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 mobile-drawer-bg dark:bg-slate-950">
                     <button
-                        onClick={handleLogout}
+                        onClick={onLogout}
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                     >
                         <LogoutIcon />
@@ -291,12 +278,30 @@ export default function DashboardLayout({
     userTier = 'Standard Account',
     navItems = defaultNavItems
 }: DashboardLayoutProps) {
+    const { user, loading, logout } = useAuth();
+    const router = useRouter();
+    const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // ── Session Protection ───────────────────────────
+    // If loading is finished and no user exists, kick them to login
+    useEffect(() => {
+        if (!loading && !user) {
+            const isNgoPath = pathname.startsWith('/ngo-dashboard') || pathname === '/ngo';
+            router.push(isNgoPath ? '/ngo' : '/login');
+        }
+    }, [user, loading, router, pathname]);
+
+    const handleLogout = () => {
+        const isNgo = user?.role === 'ngo' || user?.role === 'admin';
+        logout();
+        router.push(isNgo ? '/ngo' : '/login');
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans">
             {/* Desktop sidebar */}
-            <Sidebar userInitials={userInitials} userName={userName} userTier={userTier} items={navItems} />
+            <Sidebar userInitials={userInitials} userName={userName} userTier={userTier} items={navItems} onLogout={handleLogout} />
 
             {/* Mobile top bar */}
             <MobileTopBar
@@ -313,6 +318,7 @@ export default function DashboardLayout({
                 userName={userName}
                 userTier={userTier}
                 items={navItems}
+                onLogout={handleLogout}
             />
 
             {/* Main content */}
