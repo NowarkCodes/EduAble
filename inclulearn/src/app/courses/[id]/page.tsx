@@ -208,7 +208,7 @@ export default function CourseDetailPage() {
     const [accessibilityProfile, setAccessibilityProfile] = useState<AccessibilityProfile | null>(null);
     const [gestureEnabled, setGestureEnabled] = useState(false);
     const [activeGesture, setActiveGesture] = useState<GestureId | null>(null);
-    const gestureStreamRef = useRef<MediaStream | null>(null);
+    const [gestureStream, setGestureStream] = useState<MediaStream | null>(null);
     const [
         , setCaptionsVisible
     ] = useState(true); // mirrors caption track state
@@ -870,6 +870,7 @@ export default function CourseDetailPage() {
                     <GestureEngine
                         onGesture={handleGesture}
                         cooldownMs={1500}
+                        onStreamReady={setGestureStream}
                     />
                 )
             }
@@ -881,7 +882,7 @@ export default function CourseDetailPage() {
                         activeGesture={activeGesture}
                         enabled={gestureEnabled}
                         onToggle={() => setGestureEnabled(prev => !prev)}
-                        stream={gestureStreamRef.current}
+                        stream={gestureStream}
                     />
                 )
             }

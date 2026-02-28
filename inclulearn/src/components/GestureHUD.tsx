@@ -67,7 +67,7 @@ export default function GestureHUD({ activeGesture, enabled, onToggle, stream }:
             {/* Collapsed / Expanded card */}
             {isExpanded && (
                 <div
-                    className="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden w-56"
+                    className="bg-white border border-slate-200 rounded-[4px] shadow-xl overflow-hidden w-64"
                     style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}
                 >
                     {/* Header */}
@@ -90,7 +90,7 @@ export default function GestureHUD({ activeGesture, enabled, onToggle, stream }:
                     </div>
 
                     {/* Camera thumbnail */}
-                    <div className="relative bg-slate-900 w-full h-32">
+                    <div className="relative bg-slate-900 w-full h-44">
                         {enabled && stream ? (
                             <video
                                 ref={videoRef}
@@ -125,8 +125,8 @@ export default function GestureHUD({ activeGesture, enabled, onToggle, stream }:
                     </div>
 
                     {/* Toggle row */}
-                    <div className="px-3 py-2.5 flex items-center justify-between gap-2 border-t border-slate-100">
-                        <span className="text-[11px] font-semibold text-slate-600">
+                    <div className="px-4 py-3.5 flex items-center justify-between gap-2 border-t border-slate-100">
+                        <span className="text-[12px] font-semibold text-slate-800">
                             {enabled ? 'Gestures active' : 'Gestures off'}
                         </span>
                         <button
@@ -134,21 +134,21 @@ export default function GestureHUD({ activeGesture, enabled, onToggle, stream }:
                             aria-pressed={enabled}
                             aria-label={enabled ? 'Disable gesture navigation' : 'Enable gesture navigation'}
                             style={{ minWidth: 44, minHeight: 44 }}
-                            className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${enabled ? 'bg-violet-600' : 'bg-slate-200'
+                            className={`relative inline-flex items-center h-7 w-12 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${enabled ? 'bg-violet-600' : 'bg-slate-300'
                                 }`}
                         >
                             <span
-                                className={`inline-block w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'
+                                className={`inline-block w-5 h-5 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'
                                     }`}
                             />
                         </button>
                     </div>
 
                     {/* Cheat sheet */}
-                    <div className="px-3 pb-3 space-y-1">
+                    <div className="px-4 pb-4 space-y-2">
                         {(Object.entries(GESTURE_LABELS) as [GestureId, string][]).map(([id, label]) => (
-                            <div key={id} className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                                <span className="w-2 h-2 rounded-full bg-violet-200 shrink-0" aria-hidden="true" />
+                            <div key={id} className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
+                                <span className="w-2.5 h-2.5 rounded-full bg-violet-200 shrink-0" aria-hidden="true" />
                                 {label}
                             </div>
                         ))}
