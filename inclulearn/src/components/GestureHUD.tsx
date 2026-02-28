@@ -33,9 +33,9 @@ interface GestureHUDProps {
 const GESTURE_LABELS: Record<GestureId, string> = {
     play_pause: '✋ Play / Pause',
     next_lesson: '☝️ Next Lesson',
-    prev_lesson: '👇 Prev Lesson',
+    prev_lesson: '✌️ Prev Lesson',
     raise_hand: '🤙 Raise Hand',
-    toggle_captions: '✌️ Toggle Captions',
+    toggle_captions: '👇 Toggle Captions',
 };
 
 export default function GestureHUD({ activeGesture, enabled, onToggle, stream }: GestureHUDProps) {

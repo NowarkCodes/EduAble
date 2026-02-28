@@ -15,9 +15,9 @@
  * Supported gestures:
  *   'play_pause'    — Open palm held ≥ 1 s
  *   'next_lesson'   — Index finger up
- *   'prev_lesson'   — Index finger down
+ *   'prev_lesson'   — Peace sign (index + middle up)
  *   'raise_hand'    — Pinky + thumb extended (call-me / shaka)
- *   'toggle_captions' — Peace sign (index + middle up)
+ *   'toggle_captions' — Index finger down
  */
 
 import { useEffect, useRef } from 'react';
@@ -88,18 +88,18 @@ function classify(lm: NLM[]): GestureId | null {
 
     if (allUp) return 'play_pause'; // held check handled by caller
 
-    // Peace sign: index + middle extended, ring + pinky down
-    if (indexUp && middleUp && ringDown && !pinkyUp) return 'toggle_captions';
+    // Peace sign: index + middle extended, ring + pinky down -> prev_lesson
+    if (indexUp && middleUp && ringDown && !pinkyUp) return 'prev_lesson';
 
     // Shaka / raise_hand: thumb + pinky extended, others curled
     if (thumbOut && pinkyUp && !indexUp && !middleUp && !isFingerExtended(ringTip, middleMcp)) {
         return 'raise_hand';
     }
 
-    // Index only up (pointing up → next)
+    // Index only up (pointing up → next, pointing down → toggle_captions)
     if (indexUp && !middleUp && !pinkyUp) {
         if (indexTip.y < indexMcp.y - 0.12) {
-            return indexTip.y < wrist.y ? 'next_lesson' : 'prev_lesson';
+            return indexTip.y < wrist.y ? 'next_lesson' : 'toggle_captions';
         }
     }
 
@@ -142,14 +142,18 @@ export default function GestureEngine({ onGesture, cooldownMs = 1500, onStreamRe
 
         async function init() {
             try {
-                // Fix for Next.js Emscripten "Module.arguments has been replaced" error
-                // This happens when FFmpeg and MediaPipe (both Emscripten Wasm) share window.Module
+                // Fix for Next.js Emscripten "Module.arguments" and WebGL spam
+                // MediaPipe emits scary-looking `fd_write` stack traces on startup
+                // We define a synthetic Module to silence them and avoid FFmpeg collisions
                 if (typeof window !== 'undefined') {
-                    (window as any).Module = undefined;
+                    (window as any).Module = {
+                        print: () => { },
+                        printErr: () => { },
+                        arguments: [] // Satisfy Emscripten's arg lookup
+                    };
                 }
 
-                // Load TF.js + MediaPipe Hands from CDN
-                await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js');
+                // Load MediaPipe Hands from CDN
                 await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
 
                 if (!mountedRef.current) return;
@@ -267,6 +271,12 @@ export default function GestureEngine({ onGesture, cooldownMs = 1500, onStreamRe
                 videoRef.current.srcObject = null;
                 videoRef.current.remove();
                 videoRef.current = null;
+            }
+            if (handsRef.current) {
+                try {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (handsRef.current as any).close();
+                } catch (e) { }
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
